@@ -1,22 +1,50 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
   <Folder Name="/framework/">
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Data_science/Mathematica/Math/Math/Math.NET5.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Microsoft.VisualBasic.Core/src/Core.vbproj" />
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Data_science/Mathematica/Math/Math/Math.NET5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Microsoft.VisualBasic.Core/src/Core.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/framework/directx/">
-    <Project Path="../../../Microsoft.VisualBasic.Drawing/src/DXApi/DXApi.vbproj" />
-    <Project Path="../../../Microsoft.VisualBasic.Drawing/src/DxCanvas/DxCanvas.vbproj" />
+    <Project Path="../../../Microsoft.VisualBasic.Drawing/src/DXApi/DXApi.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../Microsoft.VisualBasic.Drawing/src/DxCanvas/DxCanvas.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/framework/model/">
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Drawing-net4.8/Drawing-net4.8.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Landscape/Landscape.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Microsoft.VisualBasic.Imaging/imaging.NET5.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/mime/text%html/html_netcore5.vbproj" />
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Drawing-net4.8/Drawing-net4.8.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Landscape/Landscape.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/gr/Microsoft.VisualBasic.Imaging/imaging.NET5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/mime/text%html/html_netcore5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/framework/world/">
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Data_science/Graph/graph-netcore5.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/physics/Engine/PhysicsEngine.vbproj" />
-    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/physics/Particles/Particles.vbproj" />
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/Data_science/Graph/graph-netcore5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/physics/Engine/PhysicsEngine.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../../GCModeller/src/runtime/sciBASIC#/physics/Particles/Particles.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
-  <Project Path="VirtualWorkshop.vbproj" />
+  <Project Path="VirtualWorkshop.vbproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
 </Solution>
