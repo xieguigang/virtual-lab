@@ -177,7 +177,7 @@ Namespace Simulation
         ''' 只要超过 <c>Slop</c>(2 mm)，接触求解器就会产生法向冲量与摩擦；取 4 mm 既能夹住
         ''' 32 mm 的积木，又不会让 Baumgarte 偏置速度大到把积木弹飞。
         ''' </remarks>
-        Private Const MaxFingerSqueeze As Double = 0.004
+        Private Const MaxFingerSqueeze As Double = 0.0035
 
         ''' <summary>手指是否已经压到了物体（用的是上一步的接触信息）。</summary>
         Private _fingerContact As Boolean
@@ -224,7 +224,11 @@ Namespace Simulation
                 .AllowSleep = False,
                 .WarmStarting = True,
                 .Baumgarte = 0.2,
-                .Slop = 0.002
+
+                ' Slop 是"允许多少穿透不修正"，它同时决定了夹持力的下限：
+                ' 手指压进积木的深度必须超过 Slop，接触求解器才会给出法向冲量与摩擦。
+                ' 取 0.5 mm（原来 2 mm 时，夹持需要的挤压量会把 32 mm 的积木压变形）
+                .Slop = 0.0005
             }
 
             _world.Gravity = If(Options.EnableGravity, New Vector3(0, 0, -Options.Gravity), Vector3.Zero)
