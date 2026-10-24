@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 六轴机械臂 · 参数化生成 (Z-up, 单位 m/s/rad) -->
+<robot name="six_axis_arm">
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0.00000 0.06500 0.00000" rpy="0 0 0"/>
+      <mass value="8.000"/>
+      <inertia ixx="0.037933" ixy="0" ixz="0" iyy="0.053333" iyz="0" izz="0.037933"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.00000 0.06500 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2000 0.1300 0.2000"/>
+      </geometry>
+      <material name="dark">
+        <color rgba="0.13 0.14 0.16 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.00000 0.06500 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2000 0.1300 0.2000"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link1">
+    <inertial>
+      <origin xyz="0.00000 0.02800 0.00000" rpy="0 0 0"/>
+      <mass value="4.500"/>
+      <inertia ixx="0.004884" ixy="0" ixz="0" iyy="0.006534" iyz="0" izz="0.009150"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.00000 0.02800 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1200 0.1000 0.0550"/>
+      </geometry>
+      <material name="alu">
+        <color rgba="0.72 0.74 0.78 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.00000 0.02800 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1200 0.1000 0.0550"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link2">
+    <inertial>
+      <origin xyz="0.10750 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="3.200"/>
+      <inertia ixx="0.003355" ixy="0" ixz="0" iyy="0.014299" iyz="0" izz="0.013709"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.10750 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2150 0.0720 0.0860"/>
+      </geometry>
+      <material name="alu">
+        <color rgba="0.72 0.74 0.78 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.10750 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.2150 0.0720 0.0860"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link3">
+    <inertial>
+      <origin xyz="0.09750 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="1.600"/>
+      <inertia ixx="0.000779" ixy="0" ixz="0" iyy="0.005431" iyz="0" izz="0.005488"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.09750 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1950 0.0560 0.0520"/>
+      </geometry>
+      <material name="alu">
+        <color rgba="0.72 0.74 0.78 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.09750 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1950 0.0560 0.0520"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link4">
+    <inertial>
+      <origin xyz="0.03100 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="0.550"/>
+      <inertia ixx="0.000287" ixy="0" ixz="0" iyy="0.000320" iyz="0" izz="0.000320"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.03100 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0620 0.0560 0.0560"/>
+      </geometry>
+      <material name="alu">
+        <color rgba="0.72 0.74 0.78 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.03100 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0620 0.0560 0.0560"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link5">
+    <inertial>
+      <origin xyz="0.02500 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="0.350"/>
+      <inertia ixx="0.000134" ixy="0" ixz="0" iyy="0.000140" iyz="0" izz="0.000140"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.02500 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0500 0.0480 0.0480"/>
+      </geometry>
+      <material name="alu">
+        <color rgba="0.72 0.74 0.78 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.02500 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0500 0.0480 0.0480"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="link6">
+    <inertial>
+      <origin xyz="0.03500 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="0.300"/>
+      <inertia ixx="0.000115" ixy="0" ixz="0" iyy="0.000180" iyz="0" izz="0.000180"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.03500 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0700 0.0480 0.0480"/>
+      </geometry>
+      <material name="dark">
+        <color rgba="0.13 0.14 0.16 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.03500 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0700 0.0480 0.0480"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="tcp">
+    <inertial>
+      <origin xyz="0.00000 0.00000 0.00000" rpy="0 0 0"/>
+      <mass value="0.020"/>
+      <inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0" izz="0.000001"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.00000 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0200 0.0200 0.0200"/>
+      </geometry>
+      <material name="accent">
+        <color rgba="0.94 0.42 0.10 1.00"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.00000 0.00000 0.00000" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.0200 0.0200 0.0200"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="j1_yaw" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0.00000 0.00000 0.13200" rpy="0 0 0"/>
+    <axis xyz="0.00000 0.00000 1.00000"/>
+    <limit lower="-2.9671" upper="2.9671" effort="80.0" velocity="2.00"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="j2_shoulder" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0.00000 0.00000 0.04600" rpy="0 0 0"/>
+    <axis xyz="0.00000 -1.00000 0.00000"/>
+    <limit lower="-1.7453" upper="1.7453" effort="80.0" velocity="2.00"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="j3_elbow" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0.21500 0.00000 0.00000" rpy="0 0 0"/>
+    <axis xyz="0.00000 -1.00000 0.00000"/>
+    <limit lower="-2.1817" upper="2.1817" effort="60.0" velocity="2.50"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="j4_roll" type="revolute">
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0.19500 0.00000 0.00000" rpy="0 0 0"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+    <limit lower="-3.1416" upper="3.1416" effort="20.0" velocity="3.00"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="j5_pitch" type="revolute">
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0.06200 0.00000 0.00000" rpy="0 0 0"/>
+    <axis xyz="0.00000 -1.00000 0.00000"/>
+    <limit lower="-2.0944" upper="2.0944" effort="10.0" velocity="3.00"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="j6_roll" type="revolute">
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0.05000 0.00000 0.00000" rpy="0 0 0"/>
+    <axis xyz="1.00000 0.00000 0.00000"/>
+    <limit lower="-6.2832" upper="6.2832" effort="5.0" velocity="3.00"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+  <joint name="tcp_fixed" type="fixed">
+    <parent link="link6"/>
+    <child link="tcp"/>
+    <origin xyz="0.09500 0.00000 0.00000" rpy="0 0 0"/>
+  </joint>
+</robot>
