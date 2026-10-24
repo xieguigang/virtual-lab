@@ -198,6 +198,34 @@ Module Program
 
         Console.WriteLine($"  yaw omega (only j1): {sim.LinkBodies("link1").AngularVelocity.z:F3} angle={sim.RevoluteJoints(0).Position:F4}")
 
+        For n As Integer = 1 To 6
+            Call sim.Reset()
+
+            Dim keep As New HashSet(Of Object)()
+
+            For k As Integer = 0 To n - 1
+                keep.Add(sim.RevoluteJoints(k))
+            Next
+
+            For k As Integer = sim.World.Constraints.Count - 1 To 0 Step -1
+                If Not keep.Contains(sim.World.Constraints(k)) Then
+                    sim.World.Constraints.RemoveAt(k)
+                End If
+            Next
+
+            For Each servo In sim.JointServos
+                servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Disabled
+            Next
+
+            sim.LinkBodies("link1").AngularVelocity = New Vector3(0, 0, 5)
+
+            For k As Integer = 1 To 10
+                sim.StepOnce()
+            Next
+
+            Console.WriteLine($"  joints={n} omega={sim.LinkBodies("link1").AngularVelocity.z:F3}")
+        Next
+
         For Each servo In sim.JointServos
             servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Position
         Next
