@@ -163,9 +163,13 @@ Namespace Diagnostics
             Call Section("夹爪")
 
             Call host.ExecuteNow(ProtocolText.CmdRelease, New JsonObject())
+
+            ' 夹爪按有限速度张开/闭合，要给它时间
+            Call host.StepFixed(240)
             Dim wide As Double = simulation.GripperOpening
 
             Call host.ExecuteNow(ProtocolText.CmdGrip, New JsonObject From {{"force", 45.0}})
+            Call host.StepFixed(480)
             Dim narrow As Double = simulation.GripperOpening
 
             Call Check(wide > narrow + 0.01, $"夹爪闭合（{wide:F4} → {narrow:F4} m）")

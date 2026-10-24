@@ -245,18 +245,20 @@ Namespace Simulation
             Dim list As New List(Of BlockSpec)()
             Dim palette As String() = {"#F59E0B", "#22D3EE", "#34D399", "#F472B6", "#A78BFA", "#FBBF24", "#60A5FA"}
 
-            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.05, 0.05, 0.05}, .Mass = 0.25, .Color = palette(0)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.04, 0.03, 0.04}, .Mass = 0.15, .Color = palette(1)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.03, 0.06, 0.03}, .Mass = 0.2, .Color = palette(2)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.06, 0.02, 0.06}, .Mass = 0.3, .Color = palette(3)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Sphere, .Size = {0.042}, .Mass = 0.12, .Color = palette(4)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Cylinder, .Size = {0.036, 0.05}, .Mass = 0.18, .Color = palette(5)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Cone, .Size = {0.04, 0.05}, .Mass = 0.12, .Color = palette(6)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Frustum, .Size = {0.05, 0.025, 0.045}, .Mass = 0.16, .Color = palette(0)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Hemisphere, .Size = {0.05}, .Mass = 0.14, .Color = palette(1)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Prism, .Size = {6, 0.045, 0.045}, .Mass = 0.2, .Color = palette(2)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Pyramid, .Size = {4, 0.05, 0.05}, .Mass = 0.15, .Color = palette(3)})
-            list.Add(New BlockSpec With {.Shape = BlockShape.Disc, .Size = {0.05, 0.014}, .Mass = 0.06, .Color = palette(4)})
+            ' 夹爪张开时内间距约 36 mm，所以默认积木的横向尺寸控制在 30~34 mm，
+            ' 否则手指在下降阶段就会压到积木、把它顶开
+            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.032, 0.032, 0.032}, .Mass = 0.12, .Color = palette(0)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.030, 0.024, 0.030}, .Mass = 0.08, .Color = palette(1)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.026, 0.045, 0.026}, .Mass = 0.1, .Color = palette(2)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Box, .Size = {0.034, 0.018, 0.034}, .Mass = 0.12, .Color = palette(3)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Sphere, .Size = {0.032}, .Mass = 0.06, .Color = palette(4)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Cylinder, .Size = {0.030, 0.040}, .Mass = 0.09, .Color = palette(5)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Cone, .Size = {0.032, 0.040}, .Mass = 0.07, .Color = palette(6)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Frustum, .Size = {0.034, 0.020, 0.036}, .Mass = 0.08, .Color = palette(0)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Hemisphere, .Size = {0.034}, .Mass = 0.07, .Color = palette(1)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Prism, .Size = {6, 0.032, 0.036}, .Mass = 0.09, .Color = palette(2)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Pyramid, .Size = {4, 0.034, 0.038}, .Mass = 0.07, .Color = palette(3)})
+            list.Add(New BlockSpec With {.Shape = BlockShape.Disc, .Size = {0.034, 0.012}, .Mass = 0.04, .Color = palette(4)})
 
             Return list
         End Function

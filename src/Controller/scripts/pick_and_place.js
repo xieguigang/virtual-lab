@@ -54,6 +54,7 @@ console.log('已连接: ' + arm.info().simMode);
 
 console.log('1) 张开夹爪');
 arm.release();
+arm.sleep(600);
 
 console.log('2) 回零');
 var home = arm.home(0.6);
@@ -71,17 +72,17 @@ if (target === null) {
 
     console.log('3) 目标 ' + TARGET_ID + ' 在 (' + px.toFixed(3) + ', ' + py.toFixed(3) + ', ' + pz.toFixed(3) + ')');
 
-    console.log('4) 转到积木上方（末端朝下）');
-    movePose(px, py, pz + 0.16, 0.7);
+    console.log('4) 抬高到积木上方（末端朝下，避免连杆扫到桌面上的积木）');
+    movePose(px, py, 0.36, 0.7);
     show('   ');
 
-    console.log('5) 垂直下降到积木中段');
-    movePose(px, py, pz + FINGER_DROP, 0.3);
+    console.log('5) 垂直下降到积木两侧');
+    movePose(px, py, pz + FINGER_DROP, 0.06);
     show('   ');
 
     console.log('6) 夹紧');
-    var grip = arm.grip(50);
-    arm.sleep(500);
+    var grip = arm.grip(60);
+    arm.sleep(1200);
 
     var afterGrip = arm.state();
 
@@ -89,7 +90,7 @@ if (target === null) {
                 (afterGrip.gripper.contact ? '已接触 ' + afterGrip.gripper.holdingId : '未检测到接触'));
 
     console.log('7) 抬起');
-    movePose(px, py, pz + 0.20, 0.5);
+    movePose(px, py, pz + 0.20, 0.2);
     show('   ');
 
     console.log('8) 搬运');

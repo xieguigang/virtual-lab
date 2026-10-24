@@ -648,7 +648,8 @@ Namespace Simulation
             Dim wristPose As Pose3D = Assembly.BodyPose(poses, wristLink)
 
             For i As Integer = 0 To FingerBodies.Count - 1
-                Dim local As Vector3 = _fingerCenters(i) - _fingerAxes(i) * _fingerExtension
+                ' _fingerAxes 是"闭合方向"（指向另一根手指），所以正的行程是把手指往里推
+                Dim local As Vector3 = _fingerCenters(i) + _fingerAxes(i) * _fingerExtension
                 Dim pose As New Pose3D(wristPose.Transform(local), wristPose.Rotation)
                 Dim body As RigidBody3D = FingerBodies(i)
 
