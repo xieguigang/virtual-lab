@@ -5,6 +5,8 @@
     <RootNamespace>Controller</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
     <Platforms>AnyCPU;x64</Platforms>
+    <Nullable>disable</Nullable>
+    <StartupObject>Controller.Program</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +14,11 @@
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\mime\application%json\JSON-netcore5.vbproj" />
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\dev\VisualStudio\VisualStudio.NET5.vbproj" />
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\JavaScript\LiteJs.vbproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JavaScript 演示脚本随输出复制 -->
+    <None Include="scripts\*.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
