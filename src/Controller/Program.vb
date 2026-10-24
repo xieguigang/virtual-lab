@@ -117,7 +117,8 @@ Module Program
         Dim resolved As String = JsScriptRunner.ResolveScript(path)
 
         If String.IsNullOrEmpty(resolved) Then
-            Console.Error.WriteLine("找不到脚本: " & path)
+            Console.Error.WriteLine("找不到脚本: " & JsScriptRunner.NormalizePath(path))
+            Call PrintScriptList()
             Return 1
         End If
 
@@ -149,12 +150,9 @@ Module Program
         While True
             Console.Write("vlab> ")
 
-            Dim line As String = Console.ReadLine()
+            Dim line As String = CleanInput(Console.ReadLine())
 
             If line Is Nothing Then Exit While
-
-            line = line.Trim()
-
             If line.Length = 0 Then Continue While
 
             If Not HandleCommand(line) Then Exit While
@@ -163,6 +161,15 @@ Module Program
         Call Client.Close()
 
         Return 0
+    End Function
+
+    ''' <summary>去掉首尾空白以及 BOM、零宽字符（从管道/文件粘进来的命令常带这些）。</summary>
+    Private Function CleanInput(text As String) As String
+        If text Is Nothing Then Return ""
+
+        Dim junk As Char() = {ChrW(&HFEFF), ChrW(&H200B), ChrW(&H200C), ChrW(&H200D), ChrW(&HA0)}
+
+        Return text.Trim().Trim(junk).Trim()
     End Function
 
     ''' <summary>处理一条 REPL 命令；返回 False 表示退出。</summary>
@@ -255,10 +262,21 @@ Module Program
                     Call Thread.Sleep(If(parts.Length > 1, Integer.Parse(parts(1)), 500))
 
                 Case "js"
-                    If parts.Length < 2 Then
-                        Console.WriteLine("用法: js <脚本路径>")
+                    ' 路径可能带引号、也可能含空格，所以取 "js" 之外的整行再出去引号
+                    Dim scriptArg As String = JsScriptRunner.NormalizePath(line.Substring(2))
+
+                    If scriptArg.Length = 0 Then
+                        Console.WriteLine("用法: js <脚本路径或脚本名>")
+                        Call PrintScriptList()
                     Else
-                        Call JsScriptRunner.RunFile(Client, JsScriptRunner.ResolveScript(parts(1)))
+                        Dim resolved As String = JsScriptRunner.ResolveScript(scriptArg)
+
+                        If String.IsNullOrEmpty(resolved) Then
+                            Console.WriteLine("找不到脚本: " & scriptArg)
+                            Call PrintScriptList()
+                        ElseIf EnsureConnected() Then
+                            Call JsScriptRunner.RunFile(Client, resolved)
+                        End If
                     End If
 
                 Case "raw"
@@ -360,6 +378,24 @@ Module Program
             .WriteIndented = True,
             .Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         }))
+    End Sub
+
+    ''' <summary>列出随程序发布的示例脚本。</summary>
+    Private Sub PrintScriptList()
+        Dim files As String() = JsScriptRunner.ListScripts()
+
+        If files.Length = 0 Then
+            Dim folder As String = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scripts")
+
+            Console.WriteLine("（" & folder & " 下没有 .js 脚本）")
+            Return
+        End If
+
+        Console.WriteLine("可用脚本:")
+
+        For Each file As String In files
+            Console.WriteLine("  js " & file)
+        Next
     End Sub
 
     Private Sub PrintHelp()

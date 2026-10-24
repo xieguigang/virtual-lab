@@ -10,7 +10,6 @@
 //     可能已经把积木推了几厘米，闭环读取才是正确的做法（也给神经网络做了示范）。
 // ---------------------------------------------------------------------------
 
-var TARGET_ID = 'block-1';
 
 var DOWN_RX = 0;
 var DOWN_RY = 90;
@@ -51,6 +50,16 @@ function findObject(id) {
 console.log('=== 抓取-搬运-放下 ===');
 arm.connect();
 console.log('已连接: ' + arm.info().simMode);
+
+// 先清空场景，只留一块 32 mm 的立方体当目标：
+// 桌面上的其它积木会被接近过程中的连杆扫到，干扰抓取
+arm.clear();
+
+var spawned = arm.spawn('box', [0.032, 0.032, 0.032], [0.300, 0.000, 0.120], 0.12, 0.75, '#F59E0B');
+var TARGET_ID = spawned.id;
+
+console.log('目标积木: ' + TARGET_ID);
+arm.sleep(900);
 
 console.log('1) 张开夹爪');
 arm.release();
