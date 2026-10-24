@@ -156,6 +156,9 @@ Namespace Simulation
         ''' <summary>地面高度（世界 Z），机械臂基座底面就在这个高度。</summary>
         Public Property GroundZ As Double = 0.0
 
+        ''' <summary>弹簧木板平台（用 platform 指令创建；没有时为 Nothing）。</summary>
+        Public Property Platform As SpringPlatform
+
         ''' <summary>连杆允许的最低离地间隙（米），小于它就判定为撞地。</summary>
         Public Property GroundClearance As Double = 0.002
 
@@ -217,6 +220,11 @@ Namespace Simulation
         ' /********************************************************************************/
 
         Private Sub Build()
+            ' Slop 是"允许多少穿透不修正"，它同时决定了夹持力的下限：
+            ' 手指压进积木的深度必须超过 Slop，接触求解器才会给出法向冲量与摩擦。
+            ' 取 0.5 mm（原来 2 mm 时，要夹住就得把 32 mm 的积木明显压变形）
+            Const slop As Double = 0.0005
+
             _world = New PhysicsWorld3D With {
                 .Iterations = Options.Iterations,
                 .Substeps = Options.Substeps,
@@ -224,11 +232,7 @@ Namespace Simulation
                 .AllowSleep = False,
                 .WarmStarting = True,
                 .Baumgarte = 0.2,
-
-                ' Slop 是"允许多少穿透不修正"，它同时决定了夹持力的下限：
-                ' 手指压进积木的深度必须超过 Slop，接触求解器才会给出法向冲量与摩擦。
-                ' 取 0.5 mm（原来 2 mm 时，夹持需要的挤压量会把 32 mm 的积木压变形）
-                .Slop = 0.0005
+                .Slop = slop
             }
 
             _world.Gravity = If(Options.EnableGravity, New Vector3(0, 0, -Options.Gravity), Vector3.Zero)
@@ -250,6 +254,8 @@ Namespace Simulation
             Call GroundContacts.Clear()
             Call _linkBoxes.Clear()
             Call _fingerBoxes.Clear()
+
+            Platform = Nothing
 
             Time = 0.0
             StepCount = 0
@@ -760,7 +766,7 @@ Namespace Simulation
 
                 Array.Copy(_jointQ, _previousQ, _jointQ.Length)
                 Array.Copy(q, _jointQ, System.Math.Min(q.Length, _jointQ.Length))
-                Call ApplyKinematicPose()
+                Call ApplyKinematicPose(If(_world Is Nothing, 0.0, _world.FixedDt))
                 Return
             End If
 
@@ -831,11 +837,20 @@ Namespace Simulation
             _fingerTarget = 0.0
             _gripForce = 0.0
 
-            Call ApplyKinematicPose()
+            Call ApplyKinematicPose(If(_world Is Nothing, 0.0, _world.FixedDt))
         End Sub
 
         ''' <summary>按当前关节角把连杆与手指摆到 FK 位置（运动学模式）。</summary>
-        Private Sub ApplyKinematicPose()
+        ''' <summary>
+        ''' 把关节角写进刚体位姿。
+        ''' </summary>
+        ''' <param name="stepDt">本步的时长；大于 0 时按位姿变化率给刚体设置真实速度。</param>
+        ''' <remarks>
+        ''' <b>速度不能清零</b>：kinematic 刚体虽然不受力，但接触求解器要用它的速度算
+        ''' 相对速度。清零之后手指在求解器眼里是"静止"的——既带不动积木（摩擦没有驱动），
+        ''' 又只能靠穿透修正（Baumgarte）产生分离冲量，穿透一大就把积木射出去。
+        ''' </remarks>
+        Private Sub ApplyKinematicPose(Optional stepDt As Double = 0.0)
             If Not Options.KinematicArm Then Return
             If _jointQ Is Nothing Then Return
 
@@ -845,16 +860,21 @@ Namespace Simulation
                 Dim pose As Pose3D = Assembly.BodyPose(poses, pair.Key)
                 Dim body As RigidBody3D = pair.Value
 
+                If stepDt > 0.0 Then
+                    body.Velocity = (pose.Position - body.Position) / stepDt
+                Else
+                    body.Velocity = Vector3.Zero
+                End If
+
                 body.Position = pose.Position
                 body.Orientation = pose.Rotation
-                body.Velocity = Vector3.Zero
                 body.AngularVelocity = Vector3.Zero
             Next
 
-            Call ApplyFingerPose(poses)
+            Call ApplyFingerPose(poses, stepDt)
         End Sub
 
-        Private Sub ApplyFingerPose(poses As Dictionary(Of String, Pose3D))
+        Private Sub ApplyFingerPose(poses As Dictionary(Of String, Pose3D), Optional stepDt As Double = 0.0)
             If FingerBodies.Count = 0 OrElse Assembly.JointCount = 0 Then Return
             If _fingerCenters.Count < FingerBodies.Count Then Return
 
@@ -867,9 +887,14 @@ Namespace Simulation
                 Dim pose As New Pose3D(wristPose.Transform(local), wristPose.Rotation)
                 Dim body As RigidBody3D = FingerBodies(i)
 
+                If stepDt > 0.0 Then
+                    body.Velocity = (pose.Position - body.Position) / stepDt
+                Else
+                    body.Velocity = Vector3.Zero
+                End If
+
                 body.Position = pose.Position
                 body.Orientation = pose.Rotation
-                body.Velocity = Vector3.Zero
                 body.AngularVelocity = Vector3.Zero
             Next
         End Sub
@@ -909,7 +934,7 @@ Namespace Simulation
 
             _fingerExtension += move
 
-            Call ApplyKinematicPose()
+            Call ApplyKinematicPose(If(_world Is Nothing, 0.0, _world.FixedDt))
         End Sub
 
         Private Sub UpdateKinematicSpeeds()
@@ -1126,6 +1151,58 @@ Namespace Simulation
             Return yawRotation
         End Function
 
+        ''' <summary>把弹簧木板平台打包进状态快照（没有平台时 Present=False）。</summary>
+        Public Function CapturePlatformState() As StateSnapshot.PlatformState
+            If Platform Is Nothing OrElse Platform.Plate Is Nothing Then
+                Return New StateSnapshot.PlatformState With {.Present = False}
+            End If
+
+            Dim tilt As Double() = Platform.Tilt()
+
+            Return New StateSnapshot.PlatformState With {
+                .Present = True,
+                .PlateId = Platform.Id,
+                .TiltX = tilt(0),
+                .TiltY = tilt(1),
+                .TiltMag = tilt(2),
+                .Height = Platform.Height,
+                .Compressions = Platform.Compressions(),
+                .Forces = Platform.Forces()
+            }
+        End Function
+
+        ''' <summary>
+        ''' 创建弹簧木板平台（四角弹簧 + 一块正方形木板）。已经存在时会先拆掉旧的。
+        ''' </summary>
+        Public Function CreatePlatform(size As Vector3, center As Vector3,
+                                       Optional mass As Double = 0.6,
+                                       Optional friction As Double = 0.6,
+                                       Optional stiffness As Double = 200.0,
+                                       Optional damping As Double = 30.0,
+                                       Optional restLength As Double = 0.16,
+                                       Optional springCount As Integer = 4) As SpringPlatform
+
+            If Platform IsNot Nothing Then
+                Call Platform.Detach(_world)
+                Platform = Nothing
+            End If
+
+            Platform = SpringPlatform.Create(_world, "plate-1", size, center, mass, friction,
+                                            stiffness, damping, restLength, springCount)
+
+            Return Platform
+        End Function
+
+        ''' <summary>拆掉弹簧木板平台。</summary>
+        Public Function RemovePlatform() As Boolean
+            If Platform Is Nothing Then Return False
+
+            Call Platform.Detach(_world)
+            Platform = Nothing
+
+            Return True
+        End Function
+
         ''' <summary>生成一块积木。</summary>
         ''' <param name="shape">形状名（box/sphere/cylinder/cone/frustum/hemisphere/prism/pyramid/disc/wedge）</param>
         ''' <param name="size">尺寸数组（按形状解释）</param>
@@ -1286,6 +1363,7 @@ Namespace Simulation
                     .Contact = holdingId IsNot Nothing,
                     .HoldingId = holdingId
                 },
+                .Platform = CapturePlatformState(),
                 .Collisions = LastCollisions.ToList(),
                 .Objects = objectStates,
                 .Estop = Estop,

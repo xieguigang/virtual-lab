@@ -34,173 +34,164 @@ todos:
 
 ## 用户需求
 
-为虚拟六轴机械臂的夹爪增加一个第一视角摄像头：在工作台窗口（`src\VirtualWorkshop\VirtualWorkshop.vbproj`）里实时显示"从夹爪看出去"的画面，并对外提供 API 输出拍摄到的图像帧数据，供神经网络训练与调试使用。
+在 `src\Controller\scripts` 中新增一个更复杂的 JS 演示脚本：地面上有一组弹簧，弹簧上托着一块正方形木板；木板上重量分布不均时，木板在不均匀重力与弹簧力的相互作用下发生倾斜，倾斜木板上的重物会在重力与摩擦力的相互作用下产生滑动；地面上另有 4 块重块，机械臂要依次拾取并放到木板上、不断调整位置，最终让木板保持平衡。
 
 ## 产品概述
 
-摄像头安装在机械臂末端（link6）上，随手腕姿态实时改变视角：零位时朝前看，末端转成朝下时正好俯视桌面上的积木与夹持点。画面由仿真场景实时渲染生成（不是截图三维视口），因此无界面加速模式下同样能取到帧。上位机可通过 TCP 指令或 HTTP 直接取图，并能拿到与像素对齐的深度数据用于三维反投影。
+这是一个"感知-决策-动作"闭环的综合演示：仿真侧提供真实的压簧-木板-重块动力学（弹簧力、重力矩、库仑摩擦、滑动），上位机侧用 JS 脚本读取木板倾角、决定下一块重块的落点、驱动机械臂完成抓取与放置，最后用微调轮次把倾角收敛到阈值内。整个过程通过现有的虚拟硬件协议（TCP/HTTP）与 LiteJs 宿主 API 完成。
 
 ## 核心功能
 
-- 夹爪相机：针孔相机模型，安装位置/朝向、分辨率、视场角、帧率均可配置，默认 320×240 @ 15 Hz。
-- 实时画面：工作台右侧新增"夹爪相机"卡片，显示当前第一视角画面，并给出分辨率、帧率、单帧耗时与相机位姿读数。
-- 帧数据 API：
-- PNG 编码（base64），适合存盘、回放与可视化；HTTP 可直接返回 image/png。
-- 原始 RGB24（`width*height*3` 字节，base64），神经网络可直接 reshape 成张量。
-- 深度图（float32 米，另提供 u16 毫米），与 RGB 像素一一对应，用于点云反投影与遮挡判断。
-- 相机参数查询与在线调整（分辨率、FOV、开关、安装偏移），并提供内参 fx/fy/cx/cy 与当前外参，便于坐标系换算。
-- 上位机支持：REPL 增加 `frame` 命令（把帧写盘并打印信息）；JS 脚本可拿到帧数据并保存文件。
-- 无界面模式（headless）与自检同样可用；可用参数彻底关闭相机以节省 CPU。
+- 弹簧物理：木板四角各一根压簧支撑在地面上，可配置刚度、阻尼、自然长度；偏心负载时各簧压缩量不同，木板倾斜到力矩重新平衡为止。
+- 木板与重物：木板是受弹簧支撑的动态刚体；重块放在木板上后随倾角滑动（重力分量大于静摩擦时滑落）。
+- 机械臂配平：依次拾取地面上的 4 块重块放到木板，每放一块读一次倾角，按倾斜方向把下一块放到翘起的一侧，最后微调至平衡。
+- 可视化：三维视口里把弹簧画成随压缩量实时伸缩的螺旋线。
+- 状态反馈：协议状态里提供木板 id、X/Y 倾角、倾角幅值、各簧压缩量与弹力。
 
-## 技术栈选择
 
-- 语言与框架：VB.NET，`net10.0-windows`（沿用现有 `VirtualWorkshop.vbproj`，WinForms + `UseWPF`），不新增工程、不新增第三方依赖。
-- 渲染：**纯托管 CPU 软件光栅化**（三角形光栅化 + z-buffer + Lambert 光照），新增代码全部在 `VirtualWorkshop\Sensing\` 下。
-- 编码与显示：`System.Drawing.Bitmap`（PNG 编码、PictureBox 显示），`System.Drawing.Common` 已随 `UseWindowsForms` 可用。
-- 序列化：继续用 `System.Text.Json`（`JsonObject`），帧像素以 base64 字符串承载。
-- 协议：沿用现有 NDJSON over TCP + 手写 HTTP/1.1，只新增指令与端点，不改既有语义。
+## 技术栈
+
+- 语言与框架：VB.NET，`net10.0-windows`（VirtualWorkshop）与 `net10.0`（Controller），沿用现有工程与引用，不新增第三方依赖。
+- 物理：`Microsoft.VisualBasic.Engine.Physics`（PhysicsEngine）：`PhysicsWorld3D`、`RigidBody3D`、`ForceField3D`、`BoxCollider3D`；**新增 3D 压簧**。
+- 脚本：`LiteJs` 解释器 + `ArmJsHost` 宿主门面（注入 `arm` 全局对象）。
+- 通信：现有 NDJSON over TCP / HTTP 协议，只新增指令与状态字段。
 
 ## 实现方案与关键决策
 
-### 1. 为什么不用 Direct3D 离屏渲染（关键决策）
+### 1. 为什么要在 PhysicsEngine 里新增 Spring3D
 
-- `DxScene3DCanvas` 只能渲染它自己的视口相机，`SaveSnapshot` 截取的是整个视口，无法指定"夹爪相机"的位姿与投影矩阵；
-- headless 模式完全没有渲染上下文与窗口，D3D 方案直接不可用；
-- 用户要求"神经网络训练用的帧数据"，需要确定性、可复现、可离线批量取图。
+引擎的 `SpringJoint.vb` 是 **2D** 的，3D 侧只有 `BallJoint3D / HingeJoint3D / PrismaticJoint3D`（以及我们此前新增的 `RevoluteJoint3D / JointServo3D`）和 `ForceFields3D\{ForceField3D, GravityField3D}`，**没有任何 3D 弹簧**。按用户此前要求"缺失的仿真算法补进 PhysicsEngine 以便复用"，新增 `Spring3D`。
 
-因此采用**纯托管 CPU 光栅化**：GUI 与 headless 共用同一份代码，帧内容只取决于仿真状态与相机参数，完全确定可复现。
+### 2. Spring3D 的形态：力场还是约束
 
-### 2. 相机模型与安装
+- `PhysicsWorld3D.StepSub` 的顺序是：`重力 → ForceFields → 积分速度 → 宽相 → 窄相 → 迭代求解 → 积分位置`，力场在积分速度**之前**应用，弹簧力能正确进入积分。
+- 采用 `Inherits ForceField3D` + 覆写 `Apply(bodies)`：实现简单、参数（k/c/restLength）语义直观、便于渲染与自检读取；显式力在高刚度下有发散风险，因此加 `MaxForce` 限幅，并给出"k/m 与子步 dt"的经验取值注释。
+- 阻尼是必需的：无阻尼的压簧会永久振荡，木板无法稳定到一个倾角。
 
-- 挂在 `link6` 刚体上：`world = body.Position + R·(localOffset)`，朝向直接取 `link6` 的旋转（`forward = link6 +X`，`up = link6 +Z`），默认偏移 `(0.045, 0, 0)`，落在两指之间、手腕前方。
-- 针孔投影：`fx = fy = (H/2) / tan(fov/2)`，`cx = W/2`，`cy = H/2`；视场角默认 60°（水平方向按宽高比换算，保证不拉伸）。
-- 因为 glb 中确实存在 `Camera` 节点（相对 link6 偏移 0.03, 0.034, 0），但它没有对应的 URDF link，所以相机外参一律由代码从 link6 刚体位姿构造，不依赖 URDF。
+```vb
+Namespace ForceFields3D
+    ''' <summary>3D 压簧：世界锚点与刚体挂点之间的弹簧-阻尼器。</summary>
+    Public Class Spring3D : Inherits ForceField3D
+        Public Property Anchor As Vector3          ' 世界锚点（地面一侧）
+        Public Property Body As RigidBody3D        ' 受作用的刚体（木板）
+        Public Property LocalPoint As Vector3      ' 刚体局部挂点
+        Public Property Stiffness As Double        ' N/m
+        Public Property Damping As Double          ' N·s/m
+        Public Property RestLength As Double
+        Public Property MaxForce As Double         ' 限幅，防止显式力发散
+        Public ReadOnly Property CurrentLength As Double
+        Public ReadOnly Property Compression As Double   ' RestLength - CurrentLength
+        Public ReadOnly Property CurrentForce As Double
+        Public Overrides Sub Apply(bodies As IEnumerable(Of RigidBody3D))
+    End Class
+End Namespace
+```
 
-### 3. 光栅化实现
+力的计算：`p = Body.Position + Body.Orientation.Rotate(LocalPoint)`；`delta = p - Anchor`；`dir = 归一化(delta)`；挂点速度 `v = Body.Velocity + AngularVelocity × (p - Body.Position)`；`F = (-k·(len - rest) - c·dot(v, dir))·dir`，限幅后用 `Body.ApplyForceAtPoint(p, F)`。
 
-- 逐三角形：世界坐标 → 相机视图（`R^T·(p - camPos)`）→ 近平面裁剪（near=0.02 m）→ 透视投影 → 屏幕空间有向面积判断朝向 → 扫描线填充 + 1/z 深度插值写 z-buffer。
-- 着色：`color = material * (ambient + diffuse * max(0, dot(n, L)))`，单方向光（与视口光照方向一致），环境光 0.35，保证背光面不至于全黑。
-- 双面渲染（与视口 `CullBackFaces = False` 一致），避免夹爪内侧看穿模型。
-- 缓冲复用：`Byte()` RGB 与 `Single()` 深度缓冲按分辨率缓存，仅在分辨率变化时重建；每帧只新建一个 `CameraFrame` 对象发布出去。
+### 3. 木板为什么用四角弹簧
 
-### 4. 帧生成时机与线程模型
+单个中心压簧只提供轴向力，不提供恢复力矩，偏心负载时木板会一直翻到掉下来。四角弹簧时各簧压缩量不同、簧力差形成恢复力矩，木板会倾斜到一个可平衡的姿态——这正是"挪动重块能改变倾角、可以配平"的物理基础。
 
-- 帧**只在仿真线程生成**：`SimulationHost.Tick` / `StepFixed` 在 `Me.State = ...` 之后调用 `Camera.MaybeCapture(Simulation)`，按 15 Hz 间隔节流（GUI 的 tick 在 UI 线程，headless 在仿真循环线程，二者都是"仿真线程"，无并发写）。
-- `frame` 指令走现有 `Host.Post` → 队列 → 仿真线程执行，内部调用 `CaptureNow` 立即渲染（不受节流限制），因此拿到的帧与返回的 `time/step` 严格一致。
-- GUI 线程只读 `Camera.Latest`（`Volatile` 引用），不做任何物理/几何遍历；`PictureBox` 每帧替换 `Image` 并 `Dispose` 旧图，避免 GDI 句柄泄漏。
+### 4. 平台与指令
 
-### 5. 性能与可靠性
+- 新增 `Simulation\SpringPlatform.vb`：木板（Box 刚体）+ N 根 `Spring3D`（默认 4 角），弹簧注册进 `world.ForceFields`；提供 `PlateBody`、`Springs`、`Tilt()`（相对世界 X/Y 轴的倾角，度）、`TiltMagnitude()`。
+- 木板加入 `Simulation.Objects`（复用 `BlockInstance`），因此它自然出现在 `objects`（带 rotation，脚本可独立算倾角）、被渲染、可被 `clear`/`remove` 处理。
+- 协议新增 `CmdPlatform = "platform"`：`{size, position, stiffness, damping, springs}`，返回 `{plateId, springs:[{index, length, compression, force}]}`；`state` 增加 `platform:{plateId, tiltX, tiltY, tiltMag, springs:[...]}`。
+- `ArmSimulation` 持有 `Public Property Platform As SpringPlatform`，`Reset()/Clear` 时一并释放（从 `world.ForceFields` 移除）。
 
-- 320×240、2704 三角形：实测预期 2~5 ms/帧；15 Hz 下 CPU 占用约 3~8%，对 120 Hz 仿真步进无感。
-- 深度缓冲使用 `Single`（米），背景写 `0`；RGB 背景色与三维视口一致（`#0B0F14`），便于视觉对照。
-- 相机异常（NaN、除零、缓冲越界）被捕获后置 `Faulted` 状态并保留上一帧，绝不让它中断仿真 tick。
-- 提供 `--camera off` 与 `config {key:"camera_enabled"}` 两条关闭路径。
-- 协议向后兼容：`state` 只增加轻量 `camera` 摘要（无像素），既有字段与指令语义完全不变。
+### 5. 弹簧的可视化
+
+`OverlayRenderer` 新增 `ShowSprings` 与 `AddSprings(platform, anchor)`：用折线近似螺旋线圈（约 6 圈、每圈 8 段），圈高随 `Compression` 变化，颜色用 `UiTheme` 的 slate 灰阶（浅色主题）。走现有动态线通道（`EnsureLineCapacity` + `UploadLines`），不触发几何重建。注意 `PackColor()` 必须先 `CInt` 再移位（此前修过的 Byte 移位陷阱）。
+
+### 6. 脚本的闭环策略
+
+`scripts/balance_beam.js`：
+
+1. `arm.clear()` → `arm.platform({size:[0.24,0.24,0.02], position:[0.36,0,0.09], springs:4})`
+2. spawn 4 块重块（约 0.035 m、0.3 kg）摆在机械臂够得到的一排
+3. 每轮：读 `arm.state().platform` 的 `tiltX/tiltY` → 目标落点 = 板心 + 往翘起侧偏移 `clamp(gain·倾角, ±半宽·0.8)` → `moveTo`（末端朝下 ry=90）下降 → `grip` → 抬起 → 移到落点 → 下降 → `release`
+4. 四块放完后若 `tiltMag > 3°`：挑离板心最远的一块重新拾取并挪向翘起侧，最多若干轮
+5. 每轮打印倾角、落点、是否 `BALANCED`
+
+复用 `pick_and_place.js` 的成功经验：末端朝下（ry=90）、下降到"物体中心 z + 0.027"、`grip` 后等约 2.5 s（手指 25 mm/s）、抓取前先 `release()`、场景先 `clear()` 避免干扰。
+
+### 7. 稳定性与可靠性
+
+- 弹簧：刚度 2000~6000 N/m、阻尼 40~120 N·s/m、`MaxForce` 限幅；自检在 headless 下验证不发散。
+- 木板摩擦系数调高（避免重块全部滑落），质量适中（约 0.6 kg），静止高度约 0.09 m（机械臂可达且在地面网格之上）。
+- 平台是普通动态物体，不参与机械臂的地面穿透检测（`GroundViolation` 只查机械臂连杆）。
+- 自检新增"弹簧平台"段：无负载时四簧压缩量相等；加偏心重块后出现倾角且方向正确；移除后回弹；全程不发散（位置/力有限）。
 
 ## 架构设计
 
 ```mermaid
 flowchart LR
-  Sim[ArmSimulation 刚体与积木] --> Buffer[SceneTriangleBuffer 世界三角面]
-  Buffer --> Raster[SoftwareRasterizer z-buffer 光栅化]
-  Cam[GripperCamera 外参/内参/节流] --> Raster
-  Raster --> Frame[CameraFrame RGB + Depth]
-  Frame --> Enc[Png / RGB24 / f32 编码]
-  Enc --> Api[frame / camera 指令]
-  Enc --> Http[GET /api/v1/frame]
-  Frame --> Ui[夹爪相机卡片 PictureBox]
-  Host[SimulationHost.Tick] --> Cam
+  Script[balance_beam.js 闭环配平] --> Host[ArmJsHost arm.*]
+  Host --> Client[ArmClient NDJSON]
+  Client --> Dispatch[CommandDispatcher]
+  Dispatch --> Platform[SpringPlatform 木板+四簧]
+  Platform --> Spring[Spring3D 力场 PhysicsEngine]
+  Spring --> World[PhysicsWorld3D]
+  World --> State[StateSnapshot.platform 倾角]
+  State --> Dispatch
+  Dispatch --> Client2[响应/状态]
+  Platform --> Render[OverlayRenderer 螺旋线]
+  State --> Script
 ```
-
-### 数据流
-
-仿真步进 → 相机位姿解析（link6 位姿 × 安装偏移）→ 世界三角面变换 → 光栅化 → RGB/深度缓冲 → 发布 `Latest` → 三路消费（UI 显示、TCP `frame`、HTTP `/api/v1/frame`）。
 
 ## 目录结构
 
 ```
-src/VirtualWorkshop/
-├── Sensing/                                   # 新增：第一视角相机
-│   ├── CameraConfig.vb                        # [NEW] 相机配置：分辨率、FOV、帧率、安装偏移、开关；提供内参计算与命令行/JSON 互转
-│   ├── CameraPose.vb                          # [NEW] 相机外参：位置 + 旋转 + 前向/上向；由 link6 刚体位姿与局部偏移构造；输出 rpy 与四元数
-│   ├── SceneTriangleBuffer.vb                 # [NEW] 把仿真世界（机械臂各连杆、手指、积木）转成"世界坐标三角面 + 颜色"扁平数组；复用 SceneBuilder 的变换公式但不减渲染锚点
-│   ├── SoftwareRasterizer.vb                  # [NEW] 纯托管光栅化：视图变换、近裁剪、透视投影、扫描线填充、z-buffer、Lambert 着色；缓冲复用
-│   ├── CameraFrame.vb                         # [NEW] 一帧数据：宽高、RGB24、深度 float32、时间/步数、外参；提供 ToBitmap/ToPng/ToPngBase64/RgbBase64/DepthF32Base64/DepthU16MmBase64
-│   └── GripperCamera.vb                       # [NEW] 相机门面：MaybeCapture 节流、CaptureNow 强制渲染、Latest 发布、FPS/耗时统计、Describe() 生成状态摘要、异常隔离
-├── Simulation/
-│   ├── SimulationHost.vb                      # [MODIFY] 新增 Camera 属性；Tick/StepFixed 末尾调用 MaybeCapture；发布 State 时填充 Camera 摘要
-│   ├── StateSnapshot.vb                       # [MODIFY] 新增 CameraState{Enabled,Width,Height,Fov,Fx,Fy,Position,Pitch,Yaw,Fps,LastMs} 与 StateSnapshot.Camera
-│   └── SimulationPreset.vb                    # [MODIFY] 用命令行选项构造 CameraConfig 并交给 SimulationHost
-├── Protocol/
-│   ├── ProtocolText.vb                        # [MODIFY] 新增 CmdFrame="frame"、CmdCamera="camera"，字段 Width/Height/Format/Depth/Camera/Pose/Fx/Fy/Cx/Cy
-│   ├── CommandDispatcher.vb                   # [MODIFY] 新增 Frame(args) 与 Camera(args)：参数校验、按需即时渲染、三种编码、返回内参外参
-│   └── HttpServer.vb                          # [MODIFY] 新增 GET /api/v1/frame（返回 image/png）与 GET /api/v1/frame.json；新增 WriteBytes 二进制响应，Content-Type 可配置
-├── Configuration/
-│   └── SimulationOptions.vb                   # [MODIFY] 新增 --camera on|off、--camera-size WxH、--camera-fov、--camera-rate、--camera-offset x,y,z
-├── Diagnostics/
-│   └── SimSelfTest.vb                         # [MODIFY] 新增相机断言：帧尺寸、非全黑、深度范围、PNG 魔数、深度字节数、state.camera 摘要
-├── FormVirtualLab.Designer.vb                 # [MODIFY] 在 gripCard 与 objectCard 之间插入 cameraCard（高 236），内含 m_picCamera（359×200, SizeMode=Zoom）与 m_lblCamera；调整 Controls.Add 顺序保证卡片自上而下排列
-├── FormVirtualLab.vb                          # [MODIFY] 新增 UpdateCameraPanel（读取 Host.Camera.Latest，替换并释放旧 Bitmap，刷新读数标签）；窗体关闭时释放
-└── Program.vb                                 # [MODIFY] 帮助文本补充相机参数；--inspect 打印相机默认内参
+G:\GCModeller\src\runtime\sciBASIC#\physics\Engine\
+└── ForceFields3D\
+    └── Spring3D.vb                          # [NEW] 可复用的 3D 压簧（力场）：k/c/restLength/MaxForce，暴露 CurrentLength/Compression/CurrentForce
 
-src/Controller/
-├── Program.vb                                 # [MODIFY] REPL 新增 frame [png|rgb|depth] [输出路径] 命令：取帧、写盘、打印分辨率/字节数/耗时
-└── Scripting/ArmJsHost.vb                     # [MODIFY] 新增 frame(options) 返回字典、saveFrame(path) 写 PNG，供 JS 脚本采集画面
+G:\virtual-lab\src\VirtualWorkshop\
+├── Simulation\
+│   ├── SpringPlatform.vb                    # [NEW] 木板 + 四角弹簧组合体；Tilt/TiltMagnitude；弹簧列表供渲染与状态使用
+│   ├── ArmSimulation.vb                     # [MODIFY] 新增 Platform 属性与 BuildPlatform(...)，Reset/Clear 时释放弹簧力场
+│   └── StateSnapshot.vb                     # [MODIFY] 新增 PlatformState{PlateId,TiltX,TiltY,TiltMagnitude,Springs[]} 并挂到 StateSnapshot
+├── Protocol\
+│   ├── ProtocolText.vb                     # [MODIFY] 新增 CmdPlatform="platform" 与相关字段常量
+│   └── CommandDispatcher.vb                 # [MODIFY] 新增 Platform(args)：创建/查询/移除弹簧平台
+├── Rendering\
+│   └── OverlayRenderer.vb                   # [MODIFY] 新增 ShowSprings 与 AddSprings（螺旋线，随压缩量伸缩）
+└── Diagnostics\
+    └── SimSelfTest.vb                       # [MODIFY] 新增"弹簧平台"断言段
+
+G:\virtual-lab\src\Controller\
+├── Scripting\
+│   └── ArmJsHost.vb                         # [MODIFY] 新增 platform(options) 与 tilt() 便捷读取
+└── scripts\
+    └── balance_beam.js                      # [NEW] 弹簧木板配平演示：依次放 4 块重块 + 倾角反馈闭环微调
 ```
 
 ## 关键契约
 
-帧查询指令（TCP NDJSON，HTTP body 同构）：
+平台指令：
 
 ```
-请求: {"id":9,"cmd":"frame","params":{"format":"png","depth":"f32","width":320,"height":240}}
-响应: {"id":9,"ok":true,"result":{
-        "width":320,"height":240,"time":3.42,"step":410,
-        "format":"png","data":"<base64 png>",
-        "depth":{"format":"f32","data":"<base64 320*240*4 字节，小端 float32 米>"},
-        "camera":{"position":[0.31,-0.02,0.18],"rpy":[0,90,0],"fov":60,
-                  "fx":277.1,"fy":277.1,"cx":160,"cy":120}}}
+{"id":1,"cmd":"platform","params":{"size":[0.24,0.24,0.02],"position":[0.36,0,0.09],
+                                    "stiffness":4000,"damping":80,"springs":4}}
+→ {"ok":true,"result":{"plateId":"block-13","size":[0.24,0.24,0.02],
+                       "springs":[{"index":0,"length":0.062,"compression":0.018,"force":72.0}, ...]}}
 ```
 
-`format` 取值：`png`（默认）/`rgb`（`w*h*3` 裸字节 base64）/`both`/`all`；`depth` 取值：省略或 `false` /`f32`/`u16mm`。
-
-相机参数指令：
+状态字段：
 
 ```
-{"cmd":"camera","params":{"width":320,"height":240,"fov":60,"enabled":true,"rate":15,"offset":[0.045,0,0]}}
-→ {"ok":true,"camera":{...同上...}}
+"platform": {"plateId":"block-13","tiltX":-2.4,"tiltY":1.1,"tiltMag":2.64,
+             "springs":[{"compression":0.018,"force":72.0}, ...]}
 ```
 
-HTTP：`GET /api/v1/frame` 直接返回 `image/png`；`GET /api/v1/frame.json?depth=f32` 返回上面的 JSON。
+倾斜判据：`tiltX` 为绕世界 X 轴的倾角、`tiltY` 为绕世界 Y 轴的倾角（度），`tiltMag = sqrt(tiltX² + tiltY²)`；脚本把重块放到"翘起侧"（倾角符号相反的一侧）来抵消力矩。
 
-核心类型（各模块共享的契约）：
 
-```
-Public Class CameraFrame
-    Public Property Width As Integer
-    Public Property Height As Integer
-    Public Property Rgb As Byte()          ' Width*Height*3
-    Public Property Depth As Single()      ' Width*Height，米，0 表示背景
-    Public Property Time As Double
-    Public Property StepIndex As Long
-    Public Property Pose As CameraPose
-    Public Function ToBitmap() As Bitmap
-    Public Function ToPng() As Byte()
-End Class
-```
-
-## 执行要点
-
-- 现有 `SceneBuilder.BuildSurfaces` 输出的是**已减去渲染锚点**的坐标，相机渲染必须用未减锚点的世界坐标，不要复用它的返回值（复用变换公式即可）。
-- `MeshTriangle` 顶点是 URDF link 局部坐标，刚体原点是惯量原点：`world = body.Position + R·(p - InertialOriginOf(link))`；手指与积木的网格顶点已相对自身质心（origin 取 `Vector3.Zero`）。
-- `Drawing3D.Surface.brush` 用的是 `Microsoft.VisualBasic.Imaging.Brush`，而 PictureBox/PNG 用 `System.Drawing.Brush/Bitmap`，两者同名不同程序集，不要互相赋值。
-- `UiTheme.CreateCard(title)` 返回 `Panel` 且标题占顶部，卡片内容控件需 `Dock = Fill` 或显式坐标；新增卡片后要按 `objectCard → cameraCard → gripCard → tcpCard → jointCard` 的顺序 `Controls.Add`，才能保证自上而下的停靠次序。
-- VB 陷阱：Module 内成员不能加 `Shared`；局部变量不能与类型名/属性名同名；`System.Math.xxx` 全限定；`System.IO.Path`/`System.Environment` 全限定。
-- 帧的 base64 单行可达数百 KB（PNG 约 10~40 KB，RGB 约 300 KB），`TcpServer` 用 `ReadLine` 无长度限制，但要避免在状态订阅里推送像素。
-- 自检必须在 headless 下跑通（不依赖任何窗口/GPU），断言失败要能被 `SELFTEST PASS/FAILURES` 统计到。
+## Agent Extensions
 
 ### SubAgent
 
 - **code-explorer**
-- Purpose: 在实现前核对底层 API 的精确签名，避免凭记忆写错：`Quaternion.Rotate` / `Vector3` 的字段与运算、`RigidBody3D.Position/Orientation`、`ArmAssembly.InertialOriginOf`、`UiTheme.CreateCard` 与 `FontMonoSmall`、`JsonText` 的取值辅助方法（Str/Int/Bool/ObjectOf）、`HttpServer.WriteResponse` 的调用点。
-- Expected outcome: 给出逐字签名与文件行号，使相机内核与协议代码一次编译通过。
+- Purpose: 实现前逐字核对底层签名，避免凭记忆写错：`ForceField3D.Apply(bodies)` 的覆写签名、`RigidBody3D.ApplyForceAtPoint(worldPoint, f)` 与 `Orientation.Rotate(v)` 的确切形式、`Vector3` 的叉积/点积辅助（`Vector3Math.Cross/Dot`）、`PhysicsWorld3D.Add(ForceField3D)` 重载、`BlockInstance` 的字段构成、以及 `OverlayRenderer.AddLine` 的缓冲格式。
+- Expected outcome: 给出带文件行号的逐字签名，使 `Spring3D`、`SpringPlatform`、协议与渲染代码一次编译通过。

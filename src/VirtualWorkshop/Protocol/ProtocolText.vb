@@ -37,6 +37,7 @@ Namespace Protocol
         Public Const CmdObjects As String = "objects"
         Public Const CmdConfig As String = "config"
         Public Const CmdSimStep As String = "sim_step"
+        Public Const CmdPlatform As String = "platform"
 
         ''' <summary>取一帧夹爪相机图像。</summary>
         Public Const CmdFrame As String = "frame"

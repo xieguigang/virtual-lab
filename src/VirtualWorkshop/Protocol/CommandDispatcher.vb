@@ -81,6 +81,7 @@ Namespace Protocol
                 Case ProtocolText.CmdClear : Return Clear()
                 Case ProtocolText.CmdObjects : Return Objects()
                 Case ProtocolText.CmdConfig : Return Config(args)
+                Case ProtocolText.CmdPlatform : Return Platform(args)
                 Case ProtocolText.CmdFrame : Return Frame(args)
                 Case ProtocolText.CmdCamera : Return CameraControl(args)
                 Case Else
@@ -462,6 +463,109 @@ Namespace Protocol
                 Case Else
                     Throw New ProtocolException(ProtocolText.ErrBadParams, "未知配置项: " & key)
                     End Select
+                    End Function
+
+                    ' /********************************************************************************/
+                    '  弹簧木板平台
+                    ' /********************************************************************************/
+
+                    ''' <summary>
+                    ''' 弹簧木板平台：不带参数时查询，<c>{"remove":true}</c> 拆除，否则创建/重建。
+                    ''' </summary>
+                    ''' <remarks>
+                    ''' 参数：<c>size</c>（[宽, 深, 厚]）、<c>position</c>（板中心世界坐标）、
+                    ''' <c>mass</c>、<c>friction</c>、<c>stiffness</c>（N/m）、<c>damping</c>（N·s/m）、
+                    ''' <c>rest</c>（弹簧自然长度）、<c>springs</c>（4 或 1）。
+                    ''' </remarks>
+                    Private Function Platform(args As JsonObject) As JsonObject
+                        If args Is Nothing OrElse args.Count = 0 Then Return PlatformInfo()
+
+                        If JsonText.Bool(args, "remove", False) Then
+                            Return New JsonObject From {{"removed", Simulation.RemovePlatform()}}
+                        End If
+
+                        Dim width As Double = JsonText.Num(args, "width", 0.30)
+                        Dim depth As Double = JsonText.Num(args, "depth", 0.30)
+                        Dim thickness As Double = JsonText.Num(args, "thickness", 0.03)
+
+                        Dim size As Double() = JsonText.Numbers(args, "size")
+
+                        If size IsNot Nothing AndAlso size.Length >= 3 Then
+                            width = size(0)
+                            depth = size(1)
+                            thickness = size(2)
+                        End If
+
+                        Dim x As Double = JsonText.Num(args, "x", 0.36)
+                        Dim y As Double = JsonText.Num(args, "y", 0.0)
+                        Dim z As Double = JsonText.Num(args, "z", 0.16)
+
+                        Dim position As Double() = JsonText.Numbers(args, "position")
+
+                        If position IsNot Nothing AndAlso position.Length >= 3 Then
+                            x = position(0)
+                            y = position(1)
+                            z = position(2)
+                        End If
+
+                        Dim stiffness As Double = JsonText.Num(args, "stiffness", 200.0)
+                        Dim damping As Double = JsonText.Num(args, "damping", 30.0)
+                        Dim rest As Double = JsonText.Num(args, "rest", System.Math.Max(0.02, z - thickness * 0.5))
+                        Dim springs As Integer = CInt(JsonText.Num(args, "springs", 4))
+                        Dim mass As Double = JsonText.Num(args, "mass", 0.6)
+                        Dim friction As Double = JsonText.Num(args, "friction", 0.6)
+
+                        If width < 0.05 OrElse depth < 0.05 OrElse thickness < 0.004 Then
+                            Throw New ProtocolException(ProtocolText.ErrBadParams, "木板尺寸太小")
+                        End If
+
+                        If stiffness <= 0.0 Then
+                            Throw New ProtocolException(ProtocolText.ErrBadParams, "stiffness 必须大于 0")
+                        End If
+
+                        Dim plate As SpringPlatform = Simulation.CreatePlatform(
+                            New Vector3(width, depth, thickness),
+                            New Vector3(x, y, z),
+                            mass, friction, stiffness, damping, rest, springs)
+
+                        If plate Is Nothing Then
+                            Throw New ProtocolException(ProtocolText.ErrInternal, "创建平台失败")
+                        End If
+
+                        Return PlatformInfo()
+                    End Function
+
+                    ''' <summary>平台信息：木板 id、倾角、各弹簧压缩量与弹力。</summary>
+                    Private Function PlatformInfo() As JsonObject
+                        Dim info As StateSnapshot.PlatformState = Simulation.CapturePlatformState()
+
+                        If info Is Nothing OrElse Not info.Present Then
+                            Return New JsonObject From {{"present", False}}
+                        End If
+
+                        Dim springs As New JsonArray()
+                        Dim compressions As Double() = If(info.Compressions, New Double() {})
+                        Dim forces As Double() = If(info.Forces, New Double() {})
+
+                        For i As Integer = 0 To compressions.Length - 1
+                            springs.Add(New JsonObject From {
+                                {"index", i},
+                                {"compression", compressions(i)},
+                                {"force", If(i < forces.Length, forces(i), 0.0)}
+                            })
+                        Next
+
+                        Return New JsonObject From {
+                            {"present", True},
+                            {"plateId", info.PlateId},
+                            {"height", info.Height},
+                            {"tilt", New JsonObject From {
+                                {"x", info.TiltX},
+                                {"y", info.TiltY},
+                                {"mag", info.TiltMag}
+                            }},
+                            {"springs", springs}
+                        }
                     End Function
 
                     ' /********************************************************************************/

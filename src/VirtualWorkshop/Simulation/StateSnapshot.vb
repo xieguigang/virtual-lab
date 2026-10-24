@@ -83,6 +83,34 @@ Namespace Simulation
 
     End Class
 
+    ''' <summary>弹簧木板平台的状态（配平任务读倾角用）。</summary>
+    Public Class PlatformState
+
+        ''' <summary>木板是否存在。</summary>
+        Public Property Present As Boolean
+
+        ''' <summary>木板 id。</summary>
+        Public Property PlateId As String
+
+        ''' <summary>绕世界 X 轴的倾角（度）。</summary>
+        Public Property TiltX As Double
+
+        ''' <summary>绕世界 Y 轴的倾角（度）。</summary>
+        Public Property TiltY As Double
+
+        ''' <summary>总倾角（度）：配平的目标就是把它压到阈值内。</summary>
+        Public Property TiltMag As Double
+
+        ''' <summary>板面中心高度（米）。</summary>
+        Public Property Height As Double
+
+        ''' <summary>各弹簧的压缩量（米）。</summary>
+        Public Property Compressions As Double()
+
+        ''' <summary>各弹簧的弹力（N）。</summary>
+        Public Property Forces As Double()
+    End Class
+
     ''' <summary>
     ''' 一份不可变的仿真状态快照：仿真线程发布，网络线程与 UI 线程读取。
     ''' </summary>
@@ -121,6 +149,9 @@ Namespace Simulation
         Public Property Enabled As Boolean
         ''' <summary>"physics" 或 "kinematic"。</summary>
         Public Property SimMode As String
+
+        ''' <summary>弹簧木板平台（没有建平台时也是非 Nothing 的对象，用 Present 区分）。</summary>
+        Public Property Platform As PlatformState
 
         ''' <summary>场景中所有物体的最大线速度（用于判断"是否静止"）。</summary>
         Public Property MaxObjectSpeed As Double
