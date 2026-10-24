@@ -1,4 +1,4 @@
-// ---------------------------------------------------------------------------
+﻿// ---------------------------------------------------------------------------
 // 弹簧木板配平演示
 //
 // 用法: Controller.exe --js scripts/balance_beam.js
@@ -24,7 +24,7 @@ var PLATE_TOP = 0.015;          // 板中心 → 板顶
 
 // 块取 32 mm：夹爪闭合时能夹住它的中上部
 var BLOCK_SIZE = [0.032, 0.032, 0.032];
-var BLOCK_MASS = 0.6;
+var BLOCK_MASS = 0.35;
 var COLORS = ['#F59E0B', '#22D3EE', '#34D399', '#F472B6'];
 
 var FINGER_DROP = 0.027;        // 手指中心在 TCP 下方约 2.7 cm
@@ -144,8 +144,8 @@ console.log('1) 搭建四角弹簧木板');
 var plate = arm.platform({
     size: PLATE_SIZE,
     position: PLATE_POS,
-    stiffness: 200,
-    damping: 60
+    stiffness: 400,
+    damping: 100
 });
 
 console.log('   木板 ' + plate.plateId + '  弹簧 ' + plate.springs.length + ' 根');
@@ -203,6 +203,11 @@ while (finalTilt.tiltMag > BALANCED_DEG && rounds < 2) {
 
     for (var k = 0; k < blocks.length; k++) {
         var pos = vec(blocks[k].position);
+
+        // 只看还留在板上的块（滑落到地上的不再参与配平）
+        if (Math.abs(pos[0] - PLATE_POS[0]) > PLATE_HALF) continue;
+        if (Math.abs(pos[1] - PLATE_POS[1]) > PLATE_HALF) continue;
+
         var dx = pos[0] - PLATE_POS[0];
         var dy = pos[1] - PLATE_POS[1];
         var distance = Math.sqrt(dx * dx + dy * dy);
@@ -249,7 +254,11 @@ for (var s = 0; s < springs.springs.length; s++) {
 console.log('   最终倾角 ' + last.tiltMag.toFixed(2) + '°');
 
 if (last.tiltMag <= BALANCED_DEG) {
-    console.log('   结论: BALANCED ✓');
+    console.log('   结论: BALANCED ✓（倾角 ' + last.tiltMag.toFixed(2) + '°，阈值 ' + BALANCED_DEG + '°）');
+
+    if (last.height < 0.07) {
+        console.log('   注意: 板高 ' + last.height.toFixed(3) + ' m，已经压到行程限位附近');
+    }
 } else {
     console.log('   结论: 仍偏斜 ' + last.tiltMag.toFixed(2) + '°（阈值 ' + BALANCED_DEG + '°）');
 }

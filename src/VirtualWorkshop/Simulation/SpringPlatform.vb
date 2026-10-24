@@ -181,7 +181,7 @@ Namespace Simulation
                 ' 横向刚度远大于轴向：压簧很难被剪动，但也别太硬（否则接触求解会抖）
                 Dim spring As New Spring3D(anchor, plate, local, stiffness, damping, platform.RestLength) With {
                     .Label = id & "-spring-" & (i + 1),
-                    .MaxForce = 800.0,
+                    .MaxForce = 1500.0,
                     .ShearStiffness = stiffness * 4.0,
                     .ShearDamping = damping * 2.0
                 }
