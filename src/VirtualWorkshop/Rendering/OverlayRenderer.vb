@@ -25,6 +25,9 @@ Namespace Rendering
         ''' <summary>是否绘制地面网格（画在世界 Z = <see cref="UiTheme.GroundZ"/> 的平面上，也就是机械臂底座底面）。</summary>
         Public Property ShowGroundGrid As Boolean = True
 
+        ''' <summary>是否把弹簧平台的弹簧画成螺旋线。</summary>
+        Public Property ShowSprings As Boolean = True
+
         ''' <summary>地面网格的半边长（米），以世界原点为中心，默认覆盖整个工作区。</summary>
         Public Property GridHalfSize As Double = 0.65
 
@@ -86,6 +89,10 @@ Namespace Rendering
 
             If ShowGroundGrid Then
                 Call AddGroundGrid(anchor)
+            End If
+
+            If ShowSprings AndAlso simulation IsNot Nothing Then
+                Call AddSprings(simulation, anchor)
             End If
 
             If ShowAxes Then

@@ -1152,14 +1152,14 @@ Namespace Simulation
         End Function
 
         ''' <summary>把弹簧木板平台打包进状态快照（没有平台时 Present=False）。</summary>
-        Public Function CapturePlatformState() As StateSnapshot.PlatformState
+        Public Function CapturePlatformState() As PlatformState
             If Platform Is Nothing OrElse Platform.Plate Is Nothing Then
-                Return New StateSnapshot.PlatformState With {.Present = False}
+                Return New PlatformState With {.Present = False}
             End If
 
             Dim tilt As Double() = Platform.Tilt()
 
-            Return New StateSnapshot.PlatformState With {
+            Return New PlatformState With {
                 .Present = True,
                 .PlateId = Platform.Id,
                 .TiltX = tilt(0),

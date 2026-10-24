@@ -43,6 +43,16 @@ Namespace Simulation
         ''' <summary>阻尼（N·s/m）。</summary>
         Public Property Damping As Double = 30.0
 
+        ''' <summary>
+        ''' 板下方的静态挡块（行程限位）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 弹簧是显式力，重块砸下来时板可能被一次性压穿行程、直接贴到地面，
+        ''' 之后很难再弹回来。加一个只在下方阻挡的挡块，既能限制最大行程，
+        ''' 又不会影响板向上回弹。
+        ''' </remarks>
+        Public Property Stopper As RigidBody3D
+
         ''' <summary>四根角簧。</summary>
         Public ReadOnly Property Springs As New List(Of Spring3D)()
 
@@ -92,7 +102,7 @@ Namespace Simulation
 
                 Return Plate.Position.z
             End Get
-        End Function
+        End Property
 
         ' /********************************************************************************/
         '  构建 / 拆除
@@ -130,7 +140,19 @@ Namespace Simulation
 
             world.Add(plate)
 
+            ' 行程限位：板下方一个小的静态挡块（中心 0.02 m 高，顶面 0.03 m）
+            Dim stopper As RigidBody3D = PhysicsWorld3D.StaticBox(
+                width * 0.45, depth * 0.45, 0.02,
+                New Vector3(center.x, center.y, 0.02),
+                New PhysicsMaterial(0.9, 0.0))
+
+            stopper.Label = id & "-stopper"
+            stopper.CollisionGroup = BlockFactory.GroupEnvironment
+            stopper.CollisionMask = BlockFactory.MaskEnvironment
+            world.Add(stopper)
+
             Dim platform As New SpringPlatform With {
+                .Stopper = stopper,
                 .Plate = plate,
                 .Id = id,
                 .Size = New Vector3(width, depth, thickness),
@@ -156,9 +178,12 @@ Namespace Simulation
             For i As Integer = 0 To corners.Length - 1
                 Dim local As Vector3 = corners(i)
                 Dim anchor As New Vector3(center.x + local.x, center.y + local.y, 0.0)
+                ' 横向刚度远大于轴向：压簧很难被剪动，但也别太硬（否则接触求解会抖）
                 Dim spring As New Spring3D(anchor, plate, local, stiffness, damping, platform.RestLength) With {
                     .Label = id & "-spring-" & (i + 1),
-                    .MaxForce = 800.0
+                    .MaxForce = 800.0,
+                    .ShearStiffness = stiffness * 4.0,
+                    .ShearDamping = damping * 2.0
                 }
 
                 world.Add(spring)
@@ -179,7 +204,10 @@ Namespace Simulation
                 If world.ForceFields.Contains(spring) Then world.ForceFields.Remove(spring)
             Next
 
+            If Stopper IsNot Nothing Then world.Remove(Stopper)
             If Plate IsNot Nothing Then world.Remove(Plate)
+
+            Stopper = Nothing
 
             Call Springs.Clear()
             Call LocalPoints.Clear()
@@ -212,9 +240,11 @@ Namespace Simulation
 
         ''' <summary>一行摘要（日志用）。</summary>
         Public Function Describe() As String
-            Dim tilt As Double() = Tilt()
+            ' 注意：局部变量不能叫 tilt —— 会和 Tilt() 方法同名（VB 大小写不敏感），
+            ' 编译器会把 Tilt() 当成对局部数组的索引
+            Dim angles As Double() = Tilt()
 
-            Return $"{Id} 倾角 {tilt(2):F2}° (x {tilt(0):F2}° / y {tilt(1):F2}°)  高度 {Height:F3} m"
+            Return $"{Id} 倾角 {angles(2):F2}° (x {angles(0):F2}° / y {angles(1):F2}°)  高度 {Height:F3} m"
         End Function
 
     End Class

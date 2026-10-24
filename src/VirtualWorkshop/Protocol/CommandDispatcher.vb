@@ -537,7 +537,7 @@ Namespace Protocol
 
                     ''' <summary>平台信息：木板 id、倾角、各弹簧压缩量与弹力。</summary>
                     Private Function PlatformInfo() As JsonObject
-                        Dim info As StateSnapshot.PlatformState = Simulation.CapturePlatformState()
+                        Dim info As PlatformState = Simulation.CapturePlatformState()
 
                         If info Is Nothing OrElse Not info.Present Then
                             Return New JsonObject From {{"present", False}}
@@ -546,12 +546,21 @@ Namespace Protocol
                         Dim springs As New JsonArray()
                         Dim compressions As Double() = If(info.Compressions, New Double() {})
                         Dim forces As Double() = If(info.Forces, New Double() {})
+                        Dim platform As SpringPlatform = Simulation.Platform
+                        Dim rest As Double = If(platform Is Nothing, 0.0, platform.RestLength)
 
                         For i As Integer = 0 To compressions.Length - 1
+                            Dim length As Double = If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                                       platform.Springs(i).CurrentLength, 0.0)
+
                             springs.Add(New JsonObject From {
                                 {"index", i},
                                 {"compression", compressions(i)},
-                                {"force", If(i < forces.Length, forces(i), 0.0)}
+                                {"force", If(i < forces.Length, forces(i), 0.0)},
+                                {"length", length},
+                                {"rest", rest},
+                                {"applyCount", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                                  platform.Springs(i).ApplyCount, 0)}
                             })
                         Next
 
