@@ -207,6 +207,66 @@ Public Class ArmJsHost
         }))
     End Function
 
+    ''' <summary>
+    ''' 弹簧木板平台：不带参数时查询，传 <c>{remove:true}</c> 拆除，否则创建/重建。
+    ''' </summary>
+    ''' <remarks>
+    ''' 常用参数：<c>size:[w,d,thickness]</c>、<c>position:[x,y,z]</c>、<c>stiffness</c>、
+    ''' <c>damping</c>、<c>springs</c>、<c>mass</c>、<c>friction</c>、<c>rest</c>。
+    ''' </remarks>
+    Public Function platform(Optional options As Dictionary(Of String, Object) = Nothing) As Dictionary(Of String, Object)
+        Dim args As New JsonObject()
+
+        If options IsNot Nothing Then
+            For Each pair As KeyValuePair(Of String, Object) In options
+                args(pair.Key) = JsonBridge.FromJs(pair.Value)
+            Next
+        End If
+
+        Return ToDictionary(_client.Invoke("platform", args, 30000))
+    End Function
+
+    ''' <summary>木板倾角（度）：{tiltX, tiltY, tiltMag}，没有平台时全为 0。</summary>
+    Public Function tilt() As Dictionary(Of String, Object)
+        ' 注意：局部变量不能叫 state —— 会和 state() 方法同名（VB 大小写不敏感）
+        Dim snapshot As Dictionary(Of String, Object) = state()
+        Dim node As Object = Nothing
+
+        Dim result As New Dictionary(Of String, Object)(StringComparer.Ordinal) From {
+            {"tiltX", 0.0}, {"tiltY", 0.0}, {"tiltMag", 0.0}, {"present", False}
+        }
+
+        If snapshot Is Nothing Then Return result
+        If Not snapshot.TryGetValue("platform", node) Then Return result
+
+        Dim info As Dictionary(Of String, Object) = TryCast(node, Dictionary(Of String, Object))
+
+        If info Is Nothing Then Return result
+
+        Dim present As Object = Nothing
+
+        result("present") = info.TryGetValue("present", present) AndAlso TypeOf present Is Boolean AndAlso CBool(present)
+        result("tiltX") = NumberOf(info, "tiltX")
+        result("tiltY") = NumberOf(info, "tiltY")
+        result("tiltMag") = NumberOf(info, "tiltMag")
+        result("height") = NumberOf(info, "height")
+
+        Return result
+    End Function
+
+    Private Shared Function NumberOf(source As Dictionary(Of String, Object), key As String) As Double
+        Dim value As Object = Nothing
+
+        If Not source.TryGetValue(key, value) OrElse value Is Nothing Then Return 0.0
+        If TypeOf value Is Double Then Return CDbl(value)
+
+        Dim parsed As Double
+
+        If Double.TryParse(value.ToString(), parsed) Then Return parsed
+
+        Return 0.0
+    End Function
+
     ''' <summary>通用入口：直接发一条原始指令，paramsJson 是 JSON 文本。</summary>
     Public Function send(command As String, Optional paramsJson As String = "{}") As Dictionary(Of String, Object)
         Dim args As JsonObject = Nothing
