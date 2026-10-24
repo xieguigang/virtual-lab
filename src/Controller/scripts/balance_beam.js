@@ -47,6 +47,11 @@ function clamp(v, lo, hi) {
 }
 
 function movePose(x, y, z, speed) {
+    if (isNaN(x) || isNaN(y) || isNaN(z)) {
+        console.log('   目标坐标无效 (' + x + ', ' + y + ', ' + z + ')，跳过这次移动');
+        return;
+    }
+
     var motion = arm.moveTo(x, y, z, DOWN_RX, DOWN_RY, DOWN_RZ, speed);
     var done = arm.waitMotion(motion.motionId, 180000);
 
