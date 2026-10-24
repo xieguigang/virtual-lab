@@ -30,6 +30,9 @@ Namespace Simulation
         ''' <summary>正被夹住的物体 id（没有则为空）。</summary>
         Public Property HoldingId As String
 
+        ''' <summary>两个手指的世界坐标 [[x,y,z], [x,y,z]]（调试与观测用）。</summary>
+        Public Property Fingers As List(Of Double())
+
     End Class
 
     ''' <summary>场景中的一个积木物体。</summary>

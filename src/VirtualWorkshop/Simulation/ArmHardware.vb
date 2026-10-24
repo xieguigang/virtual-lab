@@ -254,9 +254,19 @@ Namespace Simulation
                 Dim position As Vector3 = start.Position + (targetPose.Position - start.Position) * t
                 Dim rotation As Quaternion = Quaternion.Slerp(start.Rotation, targetPose.Rotation, t)
 
+                Dim goal As New Pose3D(position, rotation)
+
+                ' 先按"位置 + 姿态"求解；六轴臂在保持末端水平的情况下往往到不了桌面高度，
+                ' 这时退化为只约束位置（姿态随动），否则 moveL 会被姿态约束卡死
                 Dim ik As IkResult = Kinematics.Solve(
-                    Simulation.Assembly, New Pose3D(position, rotation), seed,
+                    Simulation.Assembly, goal, seed,
                     positionOnly:=False, maxIterations:=80, tolerance:=0.001)
+
+                If Not ik.Success Then
+                    ik = Kinematics.Solve(
+                        Simulation.Assembly, goal, seed,
+                        positionOnly:=True, maxIterations:=80, tolerance:=0.003)
+                End If
 
                 If Not ik.Success Then
                     Return FailedMotion(MotionKind.Pose, $"逆解失败: {ik.Message}（误差 {ik.TotalError:F3}）")

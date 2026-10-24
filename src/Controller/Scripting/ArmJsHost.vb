@@ -87,6 +87,28 @@ Public Class ArmJsHost
         }))
     End Function
 
+    ''' <summary>
+    ''' 点位运动（带姿态）。rpy 用角度制。
+    ''' </summary>
+    ''' <remarks>
+    ''' 抓桌面上的积木时必须把末端转成"朝下"（ry≈90），否则夹爪是横着伸过去的，
+    ''' 手指根本碰不到积木。
+    ''' </remarks>
+    Public Function moveTo(x As Double, y As Double, z As Double,
+                           Optional rx As Double = 0, Optional ry As Double = 0, Optional rz As Double = 0,
+                           Optional speed As Double = 0.3) As Dictionary(Of String, Object)
+
+        Dim pose As New JsonObject From {
+            {"x", x}, {"y", y}, {"z", z},
+            {"rx", rx}, {"ry", ry}, {"rz", rz}
+        }
+
+        Return ToDictionary(_client.Invoke("move_to", New JsonObject From {
+            {"pose", pose},
+            {"speed", speed}
+        }))
+    End Function
+
     Public Function home(Optional speed As Double = 0.3) As Dictionary(Of String, Object)
         Return ToDictionary(_client.Invoke("home", New JsonObject From {{"speed", speed}}))
     End Function

@@ -147,6 +147,7 @@ Namespace Simulation
         Private _jointQd As Double()
         Private _previousQ As Double()
         Private _fingerExtension As Double
+        Private _fingerTarget As Double
         Private _gripForce As Double
         Private ReadOnly _fingerCenters As New List(Of Vector3)()
         Private ReadOnly _fingerAxes As New List(Of Vector3)()
@@ -485,6 +486,7 @@ Namespace Simulation
 
             If Options.KinematicArm Then
                 Call UpdateKinematicSpeeds()
+                Call UpdateFingerMotion()
             End If
 
             Call RefreshCollisions()
@@ -612,6 +614,7 @@ Namespace Simulation
             _previousQ = New Double(count - 1) {}
             _jointQd = New Double(count - 1) {}
             _fingerExtension = 0.0
+            _fingerTarget = 0.0
             _gripForce = 0.0
 
             Call ApplyKinematicPose()
@@ -654,6 +657,27 @@ Namespace Simulation
                 body.Velocity = Vector3.Zero
                 body.AngularVelocity = Vector3.Zero
             Next
+        End Sub
+
+        ''' <summary>
+        ''' 夹爪按有限速度闭合/张开。
+        ''' </summary>
+        ''' <remarks>
+        ''' 如果 <see cref="Grip"/> 直接把手指瞬移到闭合位置，一帧内就会移动 2 cm，
+        ''' kinematic 手指撞上积木时会把动量全部传给它——实测积木被弹到 0.86 m 外，
+        ''' 之后再也检测不到接触。真实夹爪有闭合速度，这里限制在 25 mm/s。
+        ''' </remarks>
+        Private Sub UpdateFingerMotion()
+            If _fingerCenters.Count = 0 Then Return
+
+            Dim maxDelta As Double = 0.025 * _world.FixedDt
+            Dim diff As Double = _fingerTarget - _fingerExtension
+
+            If System.Math.Abs(diff) < 1.0E-6 Then Return
+
+            _fingerExtension += System.Math.Max(-maxDelta, System.Math.Min(maxDelta, diff))
+
+            Call ApplyKinematicPose()
         End Sub
 
         Private Sub UpdateKinematicSpeeds()
@@ -737,8 +761,8 @@ Namespace Simulation
                 If Options.GripperMaxForce > 0.0 Then ratio = _gripForce / Options.GripperMaxForce
                 ratio = System.Math.Max(0.0, System.Math.Min(1.0, ratio))
 
-                _fingerExtension = GripperMaxExtension * ratio
-                Call ApplyKinematicPose()
+                _fingerTarget = GripperMaxExtension * ratio
+
                 Return
             End If
 
@@ -754,8 +778,8 @@ Namespace Simulation
             _gripForce = 0.0
 
             If Options.KinematicArm Then
-                _fingerExtension = -GripperOpenExtension
-                Call ApplyKinematicPose()
+                _fingerTarget = -GripperOpenExtension
+
                 Return
             End If
 
@@ -790,6 +814,17 @@ Namespace Simulation
                 Return FingerBaseGap - (FingerJoints(0).Position + FingerJoints(1).Position)
             End Get
         End Property
+
+        ''' <summary>两个手指的世界坐标。</summary>
+        Public Function FingerPositions() As List(Of Double())
+            Dim out As New List(Of Double())()
+
+            For Each body As RigidBody3D In FingerBodies
+                out.Add(StateSnapshot.ToArray(body.Position))
+            Next
+
+            Return out
+        End Function
 
         ''' <summary>当前指令夹持力（N）。</summary>
         Public ReadOnly Property GripperForce As Double
@@ -998,6 +1033,7 @@ Namespace Simulation
                 .Gripper = New GripperState With {
                     .Opening = GripperOpening,
                     .Force = GripperForce,
+                    .Fingers = FingerPositions(),
                     .Closing = If(Options.KinematicArm,
                                   _fingerExtension > 0.0,
                                   FingerServos.Count > 0 AndAlso FingerServos(0).Target > 0.0),

@@ -3,30 +3,49 @@
 //
 // 用法: Controller.exe --js scripts/pick_and_place.js
 //
-// 说明: 虚拟硬件默认的六轴臂基座在原点、沿 +X 伸出，夹爪沿手腕侧向开合，
-//       所以这里用 moveL 从正上方接近桌面上的积木。
+// 说明:
+//   * 六轴臂基座在原点、零位沿 +X 伸出；要夹桌面上的积木必须先把末端转成
+//     "朝下"（ry = 90°），否则夹爪是横着伸过去的、手指碰不到积木。
+//   * 目标位置**从 arm.objects() 实时读取**，而不是写死坐标——机械臂接近时
+//     可能已经把积木推了几厘米，闭环读取才是正确的做法（也给神经网络做了示范）。
 // ---------------------------------------------------------------------------
 
-var PICK_X = 0.30;
-var PICK_Y = -0.10;
-var PLACE_X = 0.42;
-var PLACE_Y = 0.13;
+var TARGET_ID = 'block-1';
+
+var DOWN_RX = 0;
+var DOWN_RY = 90;
+var DOWN_RZ = 0;
+
+// 末端朝下时手指中心在 TCP 下方约 2.7 cm（手指 x=0.068、TCP x=0.095）
+var FINGER_DROP = 0.027;
 
 function show(label) {
     var s = arm.state();
-    var q = s.q;
-    console.log(label + '  tcp=(' + s.tcp[0].toFixed(3) + ', ' +
-                s.tcp[1].toFixed(3) + ', ' + s.tcp[2].toFixed(3) + ')  ' +
+
+    console.log(label + '  tcp=(' + s.tcp[0].toFixed(3) + ', ' + s.tcp[1].toFixed(3) +
+                ', ' + s.tcp[2].toFixed(3) + ')  ' +
                 '开口=' + s.gripper.opening.toFixed(4) + ' m');
 }
 
-function moveTo(x, y, z, speed) {
-    var motion = arm.moveL(x, y, z, speed);
-    var done = arm.waitMotion(motion.motionId, 60000);
+function movePose(x, y, z, speed) {
+    var motion = arm.moveTo(x, y, z, DOWN_RX, DOWN_RY, DOWN_RZ, speed);
+    var done = arm.waitMotion(motion.motionId, 180000);
+
     if (!done.done || !done.success) {
-        console.log('  运动未完成: ' + done.message);
+        console.log('   运动未完成: ' + done.message);
     }
+
     return motion;
+}
+
+function findObject(id) {
+    var objects = arm.objects();
+
+    for (var i = 0; i < objects.length; i++) {
+        if (objects[i].id === id) return objects[i];
+    }
+
+    return null;
 }
 
 console.log('=== 抓取-搬运-放下 ===');
@@ -35,45 +54,60 @@ console.log('已连接: ' + arm.info().simMode);
 
 console.log('1) 张开夹爪');
 arm.release();
-console.log('   开口 = ' + arm.state().gripper.opening.toFixed(4) + ' m');
 
 console.log('2) 回零');
-var home = arm.home(0.4);
-arm.waitMotion(home.motionId, 60000);
+var home = arm.home(0.6);
+arm.waitMotion(home.motionId, 180000);
 show('   ');
 
-console.log('3) 移动到积木上方');
-moveTo(PICK_X, PICK_Y, 0.22, 0.25);
-show('   ');
+var target = findObject(TARGET_ID);
 
-console.log('4) 下降到积木');
-moveTo(PICK_X, PICK_Y, 0.085, 0.18);
-show('   ');
-
-console.log('5) 夹紧');
-var grip = arm.grip(50);
-console.log('   夹持力 = ' + grip.force + ' N   开口 = ' + grip.opening.toFixed(4) + ' m');
-arm.sleep(500);
-
-var afterGrip = arm.state();
-if (afterGrip.gripper.contact) {
-    console.log('   已接触: ' + afterGrip.gripper.holdingId);
+if (target === null) {
+    console.log('找不到 ' + TARGET_ID + '，退出');
 } else {
-    console.log('   未检测到接触（可能没夹到积木）');
+    var px = target.position[0];
+    var py = target.position[1];
+    var pz = target.position[2];
+
+    console.log('3) 目标 ' + TARGET_ID + ' 在 (' + px.toFixed(3) + ', ' + py.toFixed(3) + ', ' + pz.toFixed(3) + ')');
+
+    console.log('4) 转到积木上方（末端朝下）');
+    movePose(px, py, pz + 0.16, 0.7);
+    show('   ');
+
+    console.log('5) 垂直下降到积木中段');
+    movePose(px, py, pz + FINGER_DROP, 0.3);
+    show('   ');
+
+    console.log('6) 夹紧');
+    var grip = arm.grip(50);
+    arm.sleep(500);
+
+    var afterGrip = arm.state();
+
+    console.log('   夹持力 ' + grip.force + ' N   开口 ' + grip.opening.toFixed(4) + ' m   ' +
+                (afterGrip.gripper.contact ? '已接触 ' + afterGrip.gripper.holdingId : '未检测到接触'));
+
+    console.log('7) 抬起');
+    movePose(px, py, pz + 0.20, 0.5);
+    show('   ');
+
+    console.log('8) 搬运');
+    movePose(0.43, 0.13, pz + 0.20, 0.6);
+    show('   ');
+
+    console.log('9) 放下');
+    movePose(0.43, 0.13, pz + FINGER_DROP, 0.3);
+    arm.release();
+    arm.sleep(400);
+    show('   ');
+
+    var moved = findObject(TARGET_ID);
+
+    if (moved !== null) {
+        console.log('   积木最终位置 (' + moved.position[0].toFixed(3) + ', ' +
+                    moved.position[1].toFixed(3) + ', ' + moved.position[2].toFixed(3) + ')');
+    }
 }
-
-console.log('6) 抬起');
-moveTo(PICK_X, PICK_Y, 0.26, 0.2);
-show('   ');
-
-console.log('7) 搬运');
-moveTo(PLACE_X, PLACE_Y, 0.26, 0.2);
-show('   ');
-
-console.log('8) 放下');
-moveTo(PLACE_X, PLACE_Y, 0.09, 0.18);
-arm.release();
-arm.sleep(400);
-show('   ');
 
 console.log('=== 完成 ===');
