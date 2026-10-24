@@ -20,7 +20,7 @@ Partial Class FormVirtualLab
     Friend WithEvents m_canvas As Microsoft.VisualBasic.Drawing.DirectX.DxScene3DCanvas
 
     Friend WithEvents m_top As Panel
-    Friend WithEvents m_side As Panel
+    Friend WithEvents m_side As FlowLayoutPanel
     Friend WithEvents m_bottom As Panel
     Friend WithEvents m_viewport As Panel
 
@@ -54,7 +54,7 @@ Partial Class FormVirtualLab
         Me.components = New System.ComponentModel.Container()
 
         Me.m_top = New Panel()
-        Me.m_side = New Panel()
+        Me.m_side = New FlowLayoutPanel()
         Me.m_bottom = New Panel()
         Me.m_viewport = New Panel()
         Me.m_canvas = New Microsoft.VisualBasic.Drawing.DirectX.DxScene3DCanvas()
@@ -156,10 +156,16 @@ Partial Class FormVirtualLab
         Me.m_side.BackColor = UiTheme.Background
         Me.m_side.Padding = New Padding(8)
 
-        ' 卡片总高会超过面板高度，用滚动条兜底（夹爪相机固定在最上方）
+        ' 用 FlowLayoutPanel 而不是 Panel：Dock=Top 的卡片在 Panel 里会被压缩，
+        ' 而 FlowLayoutPanel 会保留每个卡片的设计高度并给出滚动条
         Me.m_side.AutoScroll = True
+        Me.m_side.FlowDirection = FlowDirection.TopDown
+        Me.m_side.WrapContents = False
 
         Dim jointCard As Panel = UiTheme.CreateCard("关节状态")
+        jointCard.Dock = DockStyle.None
+        jointCard.Width = 352
+        jointCard.Margin = New Padding(0, 0, 0, 8)
         jointCard.Height = 200
 
         Dim jointsHost As New Panel With {
@@ -221,6 +227,9 @@ Partial Class FormVirtualLab
         Next
 
         Dim tcpCard As Panel = UiTheme.CreateCard("TCP 位姿")
+        tcpCard.Dock = DockStyle.None
+        tcpCard.Width = 352
+        tcpCard.Margin = New Padding(0, 0, 0, 8)
         tcpCard.Height = 86
 
         Me.m_lblTcp = New Label With {
