@@ -121,6 +121,58 @@ Namespace Rendering
             renderer.UploadLines(_pending, count)
         End Sub
 
+        ''' <summary>把弹簧平台的每根弹簧画成螺旋线圈（随压缩量自然伸缩）。</summary>
+        Private Sub AddSprings(simulation As ArmSimulation, anchor As Vector3)
+            Dim platform As SpringPlatform = simulation.Platform
+
+            If platform Is Nothing OrElse platform.Springs.Count = 0 Then Return
+
+            For Each spring As Microsoft.VisualBasic.Engine.Physics.ForceFields3D.Spring3D In platform.Springs
+                Call AddSpringCoil(spring, anchor)
+            Next
+        End Sub
+
+        Private Sub AddSpringCoil(coil As Microsoft.VisualBasic.Engine.Physics.ForceFields3D.Spring3D,
+                                  anchor As Vector3)
+
+            If coil Is Nothing Then Return
+
+            Dim from As Vector3 = coil.Anchor - anchor
+            Dim [to] As Vector3 = coil.AttachPoint - anchor
+            Dim axis As Vector3 = [to] - from
+            Dim length As Double = Vector3Math.Length(axis)
+
+            If length < 0.008 Then Return
+
+            Dim dir As Vector3 = axis / length
+            Dim helper As Vector3 = If(System.Math.Abs(dir.z) > 0.9, New Vector3(1, 0, 0), New Vector3(0, 0, 1))
+            Dim u As Vector3 = Vector3Math.Normalize(Vector3Math.Cross(dir, helper))
+            Dim v As Vector3 = Vector3Math.Cross(dir, u)
+
+            Const turns As Integer = 7
+            Const perTurn As Integer = 10
+            Dim radius As Double = System.Math.Min(0.022, System.Math.Max(0.008, length * 0.16))
+            Dim segments As Integer = turns * perTurn
+            Dim previous As Vector3 = from
+
+            For i As Integer = 1 To segments
+                Dim t As Double = i / CDbl(segments)
+                Dim angle As Double = t * turns * 2.0 * System.Math.PI
+                Dim offset As Vector3 = u * (System.Math.Cos(angle) * radius) + v * (System.Math.Sin(angle) * radius)
+                Dim point As Vector3 = from + axis * t + offset
+
+                Call AddLine(previous, point, UiTheme.GroundGridMajor)
+
+                previous = point
+            Next
+
+            ' 首尾各补一段直线，让弹簧看起来是接在锚点和板上的
+            Dim tail As Vector3 = axis * 0.06
+
+            Call AddLine(from, from + tail, UiTheme.GroundGridMajor)
+            Call AddLine([to] - tail, [to], UiTheme.GroundGridMajor)
+        End Sub
+
         ''' <summary>
         ''' 世界 Z = <see cref="UiTheme.GroundZ"/> 平面上的地面网格（以世界原点为中心）。
         ''' </summary>
