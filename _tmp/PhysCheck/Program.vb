@@ -9,6 +9,8 @@ Module Program
     Private failures As Integer = 0
 
     Sub Main(args As String())
+        Call TestModel()
+
         Call TestPendulum()
         Call TestLimit()
         Call TestGrip(40.0, "strong")
@@ -20,6 +22,53 @@ Module Program
         If failures > 0 Then
             Environment.Exit(1)
         End If
+    End Sub
+
+    Private Sub TestModel()
+        Console.WriteLine("== model ==")
+
+        Dim urdfPath As String = "G:\virtual-lab\models\six_axis_arm.urdf"
+        Dim glbPath As String = "G:\virtual-lab\models\six_axis_arm.glb"
+        Dim robot As VirtualWorkshop.Model.UrdfRobot = VirtualWorkshop.Model.UrdfRobot.Load(urdfPath)
+
+        Console.WriteLine($"  links={robot.Links.Count} joints={robot.Joints.Count} movable={robot.MovableJoints.Count} root={robot.RootLink.Name}")
+        Check(robot.Links.Count = 8, "8 links parsed")
+        Check(robot.MovableJoints.Count = 6, "6 revolute joints parsed")
+
+        Dim scene As VirtualWorkshop.Model.GlbScene =
+            VirtualWorkshop.Model.GlbLinkLoader.Load(glbPath, robot.Links.Select(Function(l) l.Name))
+
+        Console.WriteLine($"  triangles={scene.TriangleCount} landscape={scene.LandscapeTriangleCount} nodes={scene.NodeCount} meshes={scene.MeshCount}")
+
+        For Each name As String In scene.MeshNames()
+            Dim mesh = scene.GetMesh(name)
+            Console.WriteLine($"    {name}: {mesh.TriangleCount} tris  bounds=({mesh.BoundsMin.X:F3},{mesh.BoundsMin.Y:F3},{mesh.BoundsMin.Z:F3})..({mesh.BoundsMax.X:F3},{mesh.BoundsMax.Y:F3},{mesh.BoundsMax.Z:F3})")
+        Next
+
+        Check(scene.TriangleCount = 2704, "2704 triangles")
+        Check(scene.TriangleCount = scene.LandscapeTriangleCount, "Landscape agrees on triangle count")
+
+        Dim assembly = VirtualWorkshop.Model.ArmAssembly.Build(robot, scene)
+        Console.WriteLine("  " & assembly.Describe())
+        Check(assembly.JointCount = 6, "6 joint definitions")
+
+        Dim zeroQ As Double() = {0, 0, 0, 0, 0, 0}
+        Dim zero = assembly.TcpPose(zeroQ)
+        Console.WriteLine($"  TCP zero = ({zero.Position.x:F4}, {zero.Position.y:F4}, {zero.Position.z:F4})")
+        Check(Math.Abs(zero.Position.x - 0.617) < 0.001 AndAlso Math.Abs(zero.Position.z - 0.178) < 0.001,
+              "TCP position at zero pose matches the URDF chain")
+
+        Dim target As New VirtualWorkshop.Model.Pose3D(New Vector3(0.45, 0.1, 0.3), zero.Rotation)
+        Dim ik = VirtualWorkshop.Model.Kinematics.Solve(assembly, target, zeroQ)
+
+        Console.WriteLine($"  IK success={ik.Success} posErr={ik.PositionError:F6} rotErr={ik.RotationError:F6} iters={ik.Iterations}")
+        Console.WriteLine($"     q={String.Join(", ", ik.Q.Select(Function(v) v.ToString("F3")))}")
+
+        Dim verify = assembly.TcpPose(ik.Q)
+        Dim gap As Double = Vector3Math.Length(verify.Position - target.Position)
+
+        Check(ik.Success, "IK reports success for a reachable pose")
+        Check(gap < 0.001, "IK result reproduces the target through FK")
     End Sub
 
     Private Function NewWorld() As PhysicsWorld3D
