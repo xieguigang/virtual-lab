@@ -70,9 +70,12 @@ Namespace Model
 
         ''' <summary>加载 GLB，并按 URDF 的 link 名分组。</summary>
         ''' <param name="file">glb 路径</param>
-        ''' <param name="linkNames">URDF 中已知的 link 名，用于确定分组归属</param>
+        ''' <param name="robot">
+        ''' URDF 机器人：节点名先按 link 名匹配，匹配不上再按 joint 名匹配并取其 child link
+        ''' （本模型的 glb 节点用的是关节名 J1_Yaw / J2_Shoulder …）
+        ''' </param>
         ''' <param name="validateWithLandscape">是否用 Landscape 再整体加载一次做面数校验</param>
-        Public Function Load(file As String, linkNames As IEnumerable(Of String),
+        Public Function Load(file As String, robot As UrdfRobot,
                              Optional validateWithLandscape As Boolean = True) As GlbScene
 
             If String.IsNullOrEmpty(file) OrElse Not System.IO.File.Exists(file) Then
@@ -96,13 +99,6 @@ Namespace Model
             End If
 
             Dim buffers As New List(Of Byte()) From {container.Binary}
-            Dim known As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
-
-            If linkNames IsNot Nothing Then
-                For Each linkName As String In linkNames
-                    known.Add(linkName)
-                Next
-            End If
 
             scene.NodeCount = root.Nodes.Length
             scene.MeshCount = If(root.Meshes Is Nothing, 0, root.Meshes.Length)
@@ -111,7 +107,7 @@ Namespace Model
 
             For Each nodeIndex As Integer In roots
                 Call WalkNode(root, nodeIndex, num.Matrix4x4.Identity, Nothing, num.Matrix4x4.Identity,
-                              known, buffers, scene)
+                              robot, buffers, scene)
             Next
 
             For Each mesh As LinkMesh In scene.Meshes.Values
@@ -169,7 +165,7 @@ Namespace Model
 
         Private Sub WalkNode(root As GltfRoot, nodeIndex As Integer, parentWorld As num.Matrix4x4,
                              currentLink As String, currentLinkInverse As num.Matrix4x4,
-                             knownLinks As HashSet(Of String), buffers As List(Of Byte()), scene As GlbScene)
+                             robot As UrdfRobot, buffers As List(Of Byte()), scene As GlbScene)
 
             If nodeIndex < 0 OrElse nodeIndex >= root.Nodes.Length Then Return
 
@@ -178,10 +174,11 @@ Namespace Model
             Dim world As num.Matrix4x4 = num.Matrix4x4.Multiply(local, parentWorld)
             Dim linkName As String = currentLink
             Dim linkInverse As num.Matrix4x4 = currentLinkInverse
+            Dim mapped As String = ResolveLinkName(robot, node.Name)
 
-            ' 该节点本身是一个 URDF link：把它作为后续子节点的局部系原点
-            If Not String.IsNullOrEmpty(node.Name) AndAlso knownLinks.Contains(node.Name) Then
-                linkName = node.Name
+            ' 该节点对应一个 URDF link：把它作为后续子节点的局部系原点
+            If Not String.IsNullOrEmpty(mapped) Then
+                linkName = mapped
 
                 Dim inverted As num.Matrix4x4
 
@@ -193,19 +190,40 @@ Namespace Model
             End If
 
             If node.MeshIndex.HasValue Then
-                Dim group As String = If(linkName, If(node.Name, "mesh" & node.MeshIndex.Value))
+                ' 分组键用节点名：Finger_L / Finger_R 需要单独拿去做手指刚体，
+                ' 因此不能把它们并进 link6 的网格里
+                Dim group As String = If(String.IsNullOrEmpty(node.Name), "mesh" & node.MeshIndex.Value, node.Name)
 
                 Call BuildMesh(root, node, node.MeshIndex.Value,
                                num.Matrix4x4.Multiply(world, linkInverse),
-                               group, buffers, scene)
+                               group, If(linkName, group), buffers, scene)
             End If
 
             If node.Children IsNot Nothing Then
                 For Each child As Integer In node.Children
-                    Call WalkNode(root, child, world, linkName, linkInverse, knownLinks, buffers, scene)
+                    Call WalkNode(root, child, world, linkName, linkInverse, robot, buffers, scene)
                 Next
             End If
         End Sub
+
+        ''' <summary>
+        ''' glTF 节点名 → URDF link 名：先按 link 名匹配，再按 joint 名匹配并取其 child。
+        ''' </summary>
+        ''' <remarks>
+        ''' 本模型的 glb 是"每个关节一个节点"的导出方式（base_link / J1_Yaw / J2_Shoulder …），
+        ''' 而 URDF 的连杆名是 link1 … link6，所以必须用 joint 名做一次桥接，
+        ''' 否则所有网格都会落到同一个分组里。
+        ''' </remarks>
+        Public Function ResolveLinkName(robot As UrdfRobot, nodeName As String) As String
+            If robot Is Nothing OrElse String.IsNullOrEmpty(nodeName) Then Return Nothing
+            If robot.FindLink(nodeName) IsNot Nothing Then Return robot.FindLink(nodeName).Name
+
+            Dim joint As UrdfJoint = robot.FindJoint(nodeName)
+
+            If joint IsNot Nothing Then Return joint.Child
+
+            Return Nothing
+        End Function
 
         Private Function LocalMatrix(node As Node) As num.Matrix4x4
             If node.Matrix IsNot Nothing AndAlso node.Matrix.Length = 16 Then
@@ -236,7 +254,7 @@ Namespace Model
         ' /********************************************************************************/
 
         Private Sub BuildMesh(root As GltfRoot, node As Node, meshIndex As Integer,
-                              nodeToLink As num.Matrix4x4, group As String,
+                              nodeToLink As num.Matrix4x4, group As String, ownerLink As String,
                               buffers As List(Of Byte()), scene As GlbScene)
 
             If root.Meshes Is Nothing OrElse meshIndex < 0 OrElse meshIndex >= root.Meshes.Length Then Return
@@ -246,6 +264,7 @@ Namespace Model
             If Not scene.Meshes.TryGetValue(group, mesh) Then
                 mesh = New LinkMesh With {
                     .LinkName = group,
+                    .OwnerLink = ownerLink,
                     .NodePath = If(node.Name, group)
                 }
                 scene.Meshes.Add(group, mesh)

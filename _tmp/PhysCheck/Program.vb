@@ -10,6 +10,7 @@ Module Program
 
     Sub Main(args As String())
         Call TestModel()
+        Call TestSimulation()
 
         Call TestPendulum()
         Call TestLimit()
@@ -36,7 +37,7 @@ Module Program
         Check(robot.MovableJoints.Count = 6, "6 revolute joints parsed")
 
         Dim scene As VirtualWorkshop.Model.GlbScene =
-            VirtualWorkshop.Model.GlbLinkLoader.Load(glbPath, robot.Links.Select(Function(l) l.Name))
+            VirtualWorkshop.Model.GlbLinkLoader.Load(glbPath, robot)
 
         Console.WriteLine($"  triangles={scene.TriangleCount} landscape={scene.LandscapeTriangleCount} nodes={scene.NodeCount} meshes={scene.MeshCount}")
 
@@ -91,6 +92,75 @@ Module Program
     End Sub
 
     ''' <summary>单摆：静态基座 + 一根连杆 + 转轴关节 + 位置伺服，检查重力下垂量是否有限。</summary>
+    Private Sub TestSimulation()
+        Console.WriteLine("== simulation ==")
+
+        Dim urdfPath As String = "G:\virtual-lab\models\six_axis_arm.urdf"
+        Dim glbPath As String = "G:\virtual-lab\models\six_axis_arm.glb"
+        Dim robot = VirtualWorkshop.Model.UrdfRobot.Load(urdfPath)
+        Dim scene = VirtualWorkshop.Model.GlbLinkLoader.Load(glbPath, robot)
+        Dim assembly = VirtualWorkshop.Model.ArmAssembly.Build(robot, scene)
+        Dim sim As New VirtualWorkshop.Simulation.ArmSimulation(assembly, New VirtualWorkshop.Simulation.ArmSimulationOptions())
+
+        Console.WriteLine($"  bodies={sim.World.Bodies.Count} joints={sim.RevoluteJoints.Count} fingers={sim.FingerBodies.Count} objects={sim.Objects.Count} gap={sim.FingerBaseGap:F4}")
+        Check(sim.RevoluteJoints.Count = 6, "6 revolute joints created")
+        Check(sim.FingerBodies.Count = 2, "2 gripper fingers created")
+        Check(sim.Objects.Count = 12, "12 default blocks spawned")
+
+        ' ---- 诊断：先关掉全部伺服，看关节是否还会自发高速旋转 ----
+        Console.WriteLine("  -- diagnostics: servos disabled --")
+
+        Dim probes As List(Of Double) = sim.JointServos.Select(Function(s) s.Stiffness).ToList()
+        For Each servo In sim.JointServos
+            servo.Mode = VirtualWorkshop.Simulation.ServoMode3D.Disabled
+        Next
+
+        sim.StepOnce()
+        Console.WriteLine($"    free step1: q4={sim.RevoluteJoints(3).Position:F4} v4={sim.RevoluteJoints(3).Speed:F4} v2={sim.RevoluteJoints(1).Speed:F4} anchorErr4={Vector3Math.Length(sim.RevoluteJoints(3).Point.AnchorError):E3}")
+
+        For Each servo In sim.JointServos
+            servo.Mode = VirtualWorkshop.Simulation.ServoMode3D.Position
+        Next
+
+        Call sim.Reset()
+
+        For i As Integer = 1 To 240
+            sim.StepOnce()
+
+            If i <= 20 Then
+                Console.WriteLine($"    step {i,3} q4={sim.RevoluteJoints(3).Position:F4} v4={sim.RevoluteJoints(3).Speed:F4} f4={sim.JointServos(3).LastForce:F2} q6={sim.RevoluteJoints(5).Position:F4} f6={sim.JointServos(5).LastForce:F2} q2={sim.RevoluteJoints(1).Position:F4}")
+            End If
+
+            If i Mod 60 = 0 Then
+                Dim part = String.Join(", ", sim.JointPositions().Select(Function(v) v.ToString("F3")))
+                Dim forces = String.Join(", ", sim.JointServos.Select(Function(s) s.LastForce.ToString("F1")))
+                Console.WriteLine($"    t={sim.Time:F2} q=({part}) tau=({forces}) col={String.Join(";", sim.LastCollisions)}")
+            End If
+        Next
+
+        Dim state = sim.CaptureState()
+        Console.WriteLine($"  hold: q=({String.Join(", ", state.Q.Select(Function(v) v.ToString("F3")))})")
+        Console.WriteLine($"  tcp=({state.Tcp(0):F3}, {state.Tcp(1):F3}, {state.Tcp(2):F3})  collisions={state.Collisions.Count}")
+        Check(state.Q.All(Function(v) Math.Abs(v) < 0.12), "arm holds the zero pose under gravity")
+
+        Dim hardware As New VirtualWorkshop.Simulation.ArmHardware(sim)
+        Dim command = hardware.MoveJ({0.3, -0.2, 0.4, 0.0, 0.4, 0.0}, 0.6)
+
+        Console.WriteLine($"  movej id={command.Id} duration={command.Duration:F2} failed={command.Failed} msg={command.Message}")
+
+        For i As Integer = 1 To 480
+            hardware.Tick()
+        Next
+
+        Dim moved = hardware.State
+        Console.WriteLine($"  after: q=({String.Join(", ", moved.Q.Select(Function(v) v.ToString("F3")))})")
+        Console.WriteLine($"  tcp=({moved.Tcp(0):F3}, {moved.Tcp(1):F3}, {moved.Tcp(2):F3})")
+
+        Check(Not command.Failed, "movej accepted")
+        Check(hardware.MotionSucceeded(command.Id), "motion reported success")
+        Check(Math.Abs(moved.Q(0) - 0.3) < 0.12 AndAlso Math.Abs(moved.Q(2) - 0.4) < 0.15, "joints reach the commanded angles")
+    End Sub
+
     Private Sub TestPendulum()
         Console.WriteLine("== pendulum servo ==")
 

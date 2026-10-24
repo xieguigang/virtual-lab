@@ -43,8 +43,13 @@ Namespace Model
     ''' </remarks>
     Public Class LinkMesh
 
-        ''' <summary>对应的 URDF link 名称。</summary>
+        ''' <summary>网格所属的 glTF 节点名（本模型里等于关节名，如 J1_Yaw / Finger_L）。</summary>
         Public Property LinkName As String
+
+        ''' <summary>
+        ''' 顶点所在的 URDF link 局部系（例如 Camera / Finger_L 的 OwnerLink 都是 link6）。
+        ''' </summary>
+        Public Property OwnerLink As String
 
         ''' <summary>在 glTF 节点树中的路径（调试用）。</summary>
         Public Property NodePath As String
