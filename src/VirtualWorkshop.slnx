@@ -10,6 +10,17 @@
     <Project Path="../../GCModeller/src/runtime/sciBASIC#/Microsoft.VisualBasic.Core/src/Core.vbproj">
       <Platform Solution="*|x64" Project="x64" />
     </Project>
+    <Project Path="../../GCModeller/src/runtime/sciBASIC#/vs_solutions/JavaScript/LiteJs.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+  </Folder>
+  <Folder Name="/framework/dev/">
+    <Project Path="../../GCModeller/src/runtime/sciBASIC#/mime/application%json/JSON-netcore5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="../../GCModeller/src/runtime/sciBASIC#/vs_solutions/dev/VisualStudio/VisualStudio.NET5.vbproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/framework/directx/">
     <Project Path="../../Microsoft.VisualBasic.Drawing/src/DXApi/DXApi.vbproj">
@@ -44,7 +55,9 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
   </Folder>
-  <Project Path="Controller/Controller.vbproj" Id="9b6e1d0d-080b-4428-9d00-5dd25a832913" />
+  <Project Path="Controller/Controller.vbproj" Id="9b6e1d0d-080b-4428-9d00-5dd25a832913">
+    <Platform Solution="Debug|x64" Project="x64" />
+  </Project>
   <Project Path="VirtualWorkshop/VirtualWorkshop.vbproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>

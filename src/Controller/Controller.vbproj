@@ -4,6 +4,14 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Controller</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
+    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\Microsoft.VisualBasic.Core\src\Core.vbproj" />
+    <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\mime\application%json\JSON-netcore5.vbproj" />
+    <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\dev\VisualStudio\VisualStudio.NET5.vbproj" />
+    <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\JavaScript\LiteJs.vbproj" />
+  </ItemGroup>
 
 </Project>
