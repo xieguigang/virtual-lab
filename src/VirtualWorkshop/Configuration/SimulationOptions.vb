@@ -220,6 +220,11 @@ Namespace Configuration
             Console.WriteLine("  --realtime <x>       仿真速度倍率（默认 1.0）")
             Console.WriteLine("  --blocks <n>         默认积木数量（默认 12）")
             Console.WriteLine("  --dynamic            使用动力学伺服驱动（默认运动学）")
+            Console.WriteLine("  --camera <on|off>    启用/关闭夹爪第一视角相机（默认 on）")
+            Console.WriteLine("  --camera-size <WxH>  相机分辨率（默认 320x240）")
+            Console.WriteLine("  --camera-fov <deg>   垂直视场角（默认 60）")
+            Console.WriteLine("  --camera-rate <hz>   自动捕获帧率（默认 15，0 表示只在请求时渲染）")
+            Console.WriteLine("  --camera-offset x,y,z 相机在 link6 上的安装偏移（默认 0.045,0,0）")
             Console.WriteLine("  --no-server          不启动任何网络服务")
             Console.WriteLine("  --help               显示本帮助")
         End Sub

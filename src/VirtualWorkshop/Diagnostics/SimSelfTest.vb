@@ -49,6 +49,21 @@ Namespace Diagnostics
             Console.WriteLine($"  TCP(zero) = ({zeroPose.Position.x:F4}, {zeroPose.Position.y:F4}, {zeroPose.Position.z:F4})")
             Console.WriteLine($"  meshes    = {assembly.Meshes.MeshNames().Count} / {assembly.Meshes.TriangleCount} triangles")
 
+            Dim camera As Sensing.GripperCamera = preset.Host?.Camera
+
+            Console.WriteLine()
+
+            If camera Is Nothing Then
+                Console.WriteLine("  camera    = 已关闭（--camera off）")
+            Else
+                Dim config As Sensing.CameraConfig = camera.Config
+
+                Console.WriteLine($"  camera    = {config.Width}x{config.Height} · fov {config.FieldOfView:F0}° · {config.Rate:F0} Hz")
+                Console.WriteLine($"  intrinsics= fx {config.FocalPixels:F2}  fy {config.FocalPixels:F2}  cx {config.Width / 2.0:F1}  cy {config.Height / 2.0:F1}")
+                Console.WriteLine($"  offset    = ({config.Offset.x:F3}, {config.Offset.y:F3}, {config.Offset.z:F3})  (link6 局部坐标)")
+                Console.WriteLine($"  hfov      = {config.HorizontalFieldOfView:F1}°")
+            End If
+
             Return 0
         End Function
 

@@ -242,6 +242,9 @@ Partial Class FormVirtualLab
         tcpCard.Controls.Add(Me.m_lblTcp)
 
         Dim gripCard As Panel = UiTheme.CreateCard("夹爪")
+        gripCard.Dock = DockStyle.None
+        gripCard.Width = 352
+        gripCard.Margin = New Padding(0, 0, 0, 8)
         gripCard.Height = 116
 
         Dim gripFlow As New FlowLayoutPanel With {
@@ -292,11 +295,16 @@ Partial Class FormVirtualLab
 
         ' ---------------- 夹爪相机（第一视角） ----------------
         Dim cameraCard As Panel = UiTheme.CreateCard("夹爪相机 · 第一视角")
+        cameraCard.Dock = DockStyle.None
+        cameraCard.Width = 352
+        cameraCard.Margin = New Padding(0, 0, 0, 8)
         cameraCard.Height = 200
 
+        ' 卡片内部用绝对定位：CreateCard 的标题已经 Dock=Top，再叠多个 Dock 控件次序不好控
         Me.m_picCamera = New PictureBox With {
-            .Dock = DockStyle.Top,
-            .Height = 140,
+            .Location = New Point(12, 32),
+            .Size = New Size(328, 138),
+            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right,
             .BackColor = UiTheme.Background,
             .SizeMode = PictureBoxSizeMode.Zoom,
             .BorderStyle = BorderStyle.FixedSingle,
@@ -305,19 +313,22 @@ Partial Class FormVirtualLab
 
         Me.m_lblCamera = New Label With {
             .Text = "等待相机第一帧…",
-            .Dock = DockStyle.Fill,
+            .Location = New Point(12, 173),
+            .Size = New Size(328, 16),
+            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right,
             .ForeColor = UiTheme.TextMuted,
             .Font = UiTheme.FontMonoSmall,
             .BackColor = Color.Transparent,
             .TextAlign = ContentAlignment.MiddleLeft
         }
 
-        ' 先加 Top 的图片框、再加 Fill 的标签，停靠顺序才是"标题 → 画面 → 读数"
         cameraCard.Controls.Add(Me.m_picCamera)
         cameraCard.Controls.Add(Me.m_lblCamera)
 
         Dim objectCard As Panel = UiTheme.CreateCard("场景物体")
-        objectCard.Dock = DockStyle.Top
+        objectCard.Dock = DockStyle.None
+        objectCard.Width = 352
+        objectCard.Margin = New Padding(0, 0, 0, 8)
         objectCard.Height = 124
 
         Me.m_lstObjects = New ListBox With {
@@ -330,13 +341,12 @@ Partial Class FormVirtualLab
         }
         objectCard.Controls.Add(Me.m_lstObjects)
 
-        ' Dock=Top 的卡片：后添加的排在更上面。
-        ' 夹爪相机放最上面，保证窗口矮的时候也一直能看见第一视角
-        Me.m_side.Controls.Add(objectCard)
-        Me.m_side.Controls.Add(gripCard)
-        Me.m_side.Controls.Add(tcpCard)
-        Me.m_side.Controls.Add(jointCard)
+        ' FlowLayoutPanel 按添加顺序自上而下排列；相机放最前，保证一直可见
         Me.m_side.Controls.Add(cameraCard)
+        Me.m_side.Controls.Add(jointCard)
+        Me.m_side.Controls.Add(tcpCard)
+        Me.m_side.Controls.Add(gripCard)
+        Me.m_side.Controls.Add(objectCard)
 
         ' ---------------- 底部日志 ----------------
         Me.m_bottom.Dock = DockStyle.Bottom

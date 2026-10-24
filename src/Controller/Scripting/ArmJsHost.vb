@@ -1,3 +1,4 @@
+Imports System.IO
 Imports System.Text.Json.Nodes
 Imports System.Threading
 
@@ -224,6 +225,67 @@ Public Class ArmJsHost
     ' /********************************************************************************/
     '  辅助
     ' /********************************************************************************/
+
+    ' /********************************************************************************/
+    '  夹爪相机
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 取一帧夹爪第一视角图像。
+    ''' </summary>
+    ''' <param name="format">png（base64 PNG）或 rgb（base64 原始 RGB24）</param>
+    ''' <param name="depth">留空不带深度；"f32" 或 "u16mm" 时附带深度图</param>
+    Public Function frame(Optional format As String = "png",
+                          Optional depth As String = Nothing) As Dictionary(Of String, Object)
+
+        Dim args As New JsonObject From {{"format", format}}
+
+        If Not String.IsNullOrEmpty(depth) Then args("depth") = depth
+
+        Return ToDictionary(_client.Invoke("frame", args, 60000))
+    End Function
+
+    ''' <summary>
+    ''' 取一帧并保存成 PNG（可选同时保存 .depth.f32）。
+    ''' </summary>
+    Public Function saveFrame(path As String, Optional depth As Boolean = False) As Dictionary(Of String, Object)
+        Dim args As New JsonObject From {{"format", "png"}}
+
+        If depth Then args("depth") = "f32"
+
+        Dim result As Dictionary(Of String, Object) = ToDictionary(_client.Invoke("frame", args, 60000))
+        Dim data As String = Nothing
+
+        If Not result.TryGetValue("data", data) OrElse String.IsNullOrEmpty(data) Then
+            Throw New InvalidOperationException("相机没有返回图像数据")
+        End If
+
+        Dim bytes As Byte() = Convert.FromBase64String(data)
+
+        Call File.WriteAllBytes(path, bytes)
+
+        If depth Then
+            Dim node As Object = Nothing
+
+            If result.TryGetValue("depth", node) Then
+                Dim depthNode As Dictionary(Of String, Object) = TryCast(node, Dictionary(Of String, Object))
+                Dim payload As String = Nothing
+
+                If depthNode IsNot Nothing AndAlso depthNode.TryGetValue("data", payload) AndAlso
+                   Not String.IsNullOrEmpty(payload) Then
+
+                    Call File.WriteAllBytes(System.IO.Path.ChangeExtension(path, ".depth.f32"),
+                                            Convert.FromBase64String(payload))
+                End If
+            End If
+        End If
+
+        Return New Dictionary(Of String, Object)(StringComparer.Ordinal) From {
+            {"ok", True},
+            {"path", path},
+            {"bytes", bytes.Length}
+        }
+    End Function
 
     Public Function sleep(ms As Double) As Dictionary(Of String, Object)
         Thread.Sleep(CInt(System.Math.Max(0.0, System.Math.Min(600000.0, ms))))

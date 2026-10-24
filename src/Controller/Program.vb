@@ -261,6 +261,12 @@ Module Program
                 Case "sleep"
                     Call Thread.Sleep(If(parts.Length > 1, Integer.Parse(parts(1)), 500))
 
+                Case "frame"
+                    Dim mode As String = If(parts.Length > 1, parts(1).ToLowerInvariant(), "png")
+                    Dim output As String = If(parts.Length > 2, JsScriptRunner.NormalizePath(parts(2)), Nothing)
+
+                    Call SaveFrame(mode, output)
+
                 Case "js"
                     ' 路径可能带引号、也可能含空格，所以取 "js" 之外的整行再出去引号
                     Dim scriptArg As String = JsScriptRunner.NormalizePath(line.Substring(2))
@@ -380,6 +386,74 @@ Module Program
         }))
     End Sub
 
+    ''' <summary>
+    ''' 取一帧夹爪相机图像并写盘。
+    ''' </summary>
+    ''' <param name="mode">png / rgb / depth</param>
+    ''' <param name="output">输出路径；为空时写到当前目录 frame-step.png</param>
+    Private Sub SaveFrame(mode As String, output As String)
+        Dim args As New JsonObject From {{"format", "png"}}
+
+        Select Case mode
+            Case "rgb"
+                args("format") = "rgb"
+            Case "depth", "f32"
+                args("format") = "png"
+                args("depth") = "f32"
+            Case Else
+                args("format") = "png"
+        End Select
+
+        Dim result As JsonObject = Client.Invoke("frame", args, 60000)
+
+        If result Is Nothing Then
+            Console.WriteLine("没有拿到帧数据")
+            Return
+        End If
+
+        Dim data As String = If(result("data")?.ToString(), "")
+
+        If data.Length = 0 Then
+            Console.WriteLine("没有拿到帧数据")
+            Return
+        End If
+
+        Dim bytes As Byte() = Convert.FromBase64String(data)
+        Dim info As Dictionary(Of String, Object) = ToDictionary(result)
+        Dim width As Double = StatusView.Num(info, "width")
+        Dim height As Double = StatusView.Num(info, "height")
+        Dim captureMs As Double = StatusView.Num(info, "captureMs")
+        Dim stepIndex As Double = StatusView.Num(info, "step")
+        Dim extension As String = If(mode = "rgb", ".rgb", ".png")
+
+        If String.IsNullOrEmpty(output) Then
+            output = System.IO.Path.Combine(System.Environment.CurrentDirectory,
+                                             $"frame-{CInt(stepIndex)}{extension}")
+        End If
+
+        Call System.IO.File.WriteAllBytes(output, bytes)
+
+        Console.WriteLine($"已保存 {output}  {CInt(width)}x{CInt(height)}  {bytes.Length} 字节  渲染 {captureMs:F1} ms")
+
+        ' 深度另存一份（与图像像素一对一）
+        Dim depthNode As JsonObject = TryCast(result("depth"), JsonObject)
+
+        If depthNode IsNot Nothing Then
+            Dim depthData As String = If(depthNode("data")?.ToString(), "")
+
+            If depthData.Length > 0 Then
+                Dim depthPath As String = System.IO.Path.ChangeExtension(output, ".depth.f32")
+
+                Call System.IO.File.WriteAllBytes(depthPath, Convert.FromBase64String(depthData))
+                Console.WriteLine($"深度图已保存 {depthPath}  ({CInt(width)}x{CInt(height)} float32 米)")
+            End If
+        End If
+    End Sub
+
+    Private Function ToDictionary(node As JsonObject) As Dictionary(Of String, Object)
+        Return TryCast(JsonBridge.ToJs(node), Dictionary(Of String, Object))
+    End Function
+
     ''' <summary>列出随程序发布的示例脚本。</summary>
     Private Sub PrintScriptList()
         Dim files As String() = JsScriptRunner.ListScripts()
@@ -409,6 +483,7 @@ Module Program
         Console.WriteLine("  grip [force]          夹紧    release  张开")
         Console.WriteLine("  spawn <shape> [size]  生成积木    objects  列出物体    clear  清空")
         Console.WriteLine("  estop                 急停        reset    复位场景")
+        Console.WriteLine("  frame [png|rgb|depth] [文件]  抓取夹爪相机画面并保存")
         Console.WriteLine("  js <脚本>             执行 JavaScript 演示脚本")
         Console.WriteLine("  sleep <ms>            等待")
         Console.WriteLine("  quit                  退出")
