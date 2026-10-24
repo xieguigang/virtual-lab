@@ -256,7 +256,7 @@ Namespace Simulation
 
                 Dim ik As IkResult = Kinematics.Solve(
                     Simulation.Assembly, New Pose3D(position, rotation), seed,
-                    positionOnly:=False, maxIterations:=40, tolerance:=0.002)
+                    positionOnly:=False, maxIterations:=80, tolerance:=0.001)
 
                 If Not ik.Success Then
                     Return FailedMotion(MotionKind.Pose, $"逆解失败: {ik.Message}（误差 {ik.TotalError:F3}）")

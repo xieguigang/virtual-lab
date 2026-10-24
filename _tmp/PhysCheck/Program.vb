@@ -11,6 +11,15 @@ Module Program
     Private failures As Integer = 0
 
     Sub Main(args As String())
+        Dim brushType = GetType(Microsoft.VisualBasic.Imaging.Drawing3D.Surface).GetProperty("brush").PropertyType
+        Console.WriteLine("brush prop type = " & brushType.AssemblyQualifiedName)
+        Console.WriteLine("drawing brush   = " & GetType(System.Drawing.Brush).AssemblyQualifiedName)
+        Console.WriteLine("same? " & (brushType Is GetType(System.Drawing.Brush)))
+
+        For Each ctor In brushType.GetConstructors()
+            Console.WriteLine("  ctor: " & String.Join(", ", ctor.GetParameters().Select(Function(p) p.ParameterType.Name)))
+        Next
+
         Call TestModel()
         Call TestSimulation()
 

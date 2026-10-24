@@ -31,8 +31,11 @@ Namespace Rendering
 
         Public Property Canvas As DxScene3DCanvas
 
-        ''' <summary>渲染锚点：世界坐标减去它以后再交给相机（让相机绕工作中心转）。</summary>
-        Public Property Anchor As Vector3 = New Vector3(0, 0, 0.18)
+        ''' <summary>
+        ''' 渲染锚点：世界坐标减去它以后再交给相机（让相机绕工作中心转）。
+        ''' 六轴臂基座在原点、向 +X 伸展约 0.6 m，所以锚点取在整机几何中心附近。
+        ''' </summary>
+        Public Property Anchor As Vector3 = New Vector3(0.26, 0, 0.16)
 
         Public Property Enabled As Boolean = True
         Public Property LastRenderMs As Double

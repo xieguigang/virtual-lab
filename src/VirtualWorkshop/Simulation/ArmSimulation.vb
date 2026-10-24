@@ -936,15 +936,16 @@ Namespace Simulation
             Dim rpy As Double() = StateSnapshot.ToRpy(tcp.Rotation)
 
             Dim joints As New List(Of JointState)()
+            Dim jointCount As Integer = If(Options.KinematicArm, JointDefs.Count, RevoluteJoints.Count)
 
-            For i As Integer = 0 To RevoluteJoints.Count - 1
+            For i As Integer = 0 To jointCount - 1
                 Dim servo As JointServo3D = If(i < JointServos.Count, JointServos(i), Nothing)
 
                 joints.Add(New JointState With {
                     .Name = If(i < JointDefs.Count, JointDefs(i).Name, "j" & (i + 1)),
-                    .Angle = q(i),
-                    .Speed = qd(i),
-                    .Target = If(servo Is Nothing, 0.0, servo.Target),
+                    .Angle = If(i < q.Length, q(i), 0.0),
+                    .Speed = If(i < qd.Length, qd(i), 0.0),
+                    .Target = If(servo Is Nothing, If(i < q.Length, q(i), 0.0), servo.Target),
                     .Torque = If(servo Is Nothing, 0.0, servo.LastForce),
                     .Lower = If(i < JointDefs.Count, JointDefs(i).Lower, -System.Math.PI),
                     .Upper = If(i < JointDefs.Count, JointDefs(i).Upper, System.Math.PI)

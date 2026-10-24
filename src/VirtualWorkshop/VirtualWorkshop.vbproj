@@ -3,12 +3,22 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <StartupObject>VirtualWorkshop.My.MyApplication</StartupObject>
+    <StartupObject>VirtualWorkshop.Program</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
-    <MyType>WindowsForms</MyType>
+    <MyType>Empty</MyType>
     <UseWPF>True</UseWPF>
     <Platforms>AnyCPU;x64</Platforms>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <AssemblyName>VirtualWorkshop</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 模型文件复制到输出目录，保证从任意工作目录启动都能加载 -->
+    <None Include="..\..\models\six_axis_arm.glb" Link="models\six_axis_arm.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\models\six_axis_arm.urdf" Link="models\six_axis_arm.urdf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\models\wooden_block.glb" Link="models\wooden_block.glb" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\models\erlenmeyer_flask.glb" Link="models\erlenmeyer_flask.glb" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <Import Include="System.Data" />
@@ -31,18 +41,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="My Project\Application.Designer.vb">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Application.myapp</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="My Project\Application.myapp">
-      <Generator>MyApplicationCodeGenerator</Generator>
-      <LastGenOutput>Application.Designer.vb</LastGenOutput>
-    </None>
+    <Compile Remove="My Project\Application.Designer.vb" />
+    <None Remove="My Project\Application.myapp" />
   </ItemGroup>
 
 </Project>

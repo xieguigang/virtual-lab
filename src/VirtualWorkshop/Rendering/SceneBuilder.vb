@@ -28,7 +28,7 @@ Namespace Rendering
         ''' <summary>最近一次构建耗时（毫秒）。</summary>
         Public Property LastBuildMs As Double
 
-        Private ReadOnly _brushes As New Dictionary(Of String, Brush)(StringComparer.OrdinalIgnoreCase)
+        Private ReadOnly _brushes As New Dictionary(Of String, Microsoft.VisualBasic.Imaging.Brush)(StringComparer.OrdinalIgnoreCase)
         Private ReadOnly _watch As New Stopwatch()
 
         ''' <summary>构建整个场景的三角面（世界坐标，已减去渲染锚点）。</summary>
@@ -99,7 +99,7 @@ Namespace Rendering
                               origin As Vector3, anchor As Vector3, faces As List(Of Surface))
             If mesh Is Nothing OrElse mesh.TriangleCount = 0 Then Return
 
-            Dim brush As Brush = BrushOf(GetColor(mesh))
+            Dim brush As Microsoft.VisualBasic.Imaging.Brush = BrushOf(GetColor(mesh))
 
             For Each triangle As MeshTriangle In mesh.Triangles
                 Dim a As Point3D = Transform(triangle.A, position, rotation, origin, anchor)
@@ -127,15 +127,21 @@ Namespace Rendering
             Return New Point3D(CSng(world.x - anchor.x), CSng(world.y - anchor.y), CSng(world.z - anchor.z))
         End Function
 
-        Public Function BrushOf(color As String) As Brush
+        ''' <summary>
+        ''' 按颜色取画刷（带缓存）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 注意这里用的是 <c>Microsoft.VisualBasic.Imaging.SolidBrush</c>（Core 程序集），
+        ''' 而不是 <c>System.Drawing.SolidBrush</c>：<c>Drawing3D.Surface.brush</c> 声明的类型是
+        ''' 前者，两者同名但程序集不同，混用会得到 "Brush cannot be converted to Brush"。
+        ''' </remarks>
+        Public Function BrushOf(color As String) As Microsoft.VisualBasic.Imaging.Brush
             Dim key As String = If(String.IsNullOrEmpty(color), "#B8BDC7", color)
-            Dim cached As Brush = Nothing
+            Dim cached As Microsoft.VisualBasic.Imaging.Brush = Nothing
 
             If _brushes.TryGetValue(key, cached) Then Return cached
 
-            Dim parsed As Color = ParseColor(key)
-
-            cached = New SolidBrush(parsed)
+            cached = New Microsoft.VisualBasic.Imaging.SolidBrush(ParseColor(key))
             _brushes(key) = cached
 
             Return cached
@@ -156,7 +162,7 @@ Namespace Rendering
         End Function
 
         Public Sub ClearBrushes()
-            For Each brush As Brush In _brushes.Values
+            For Each brush As Microsoft.VisualBasic.Imaging.Brush In _brushes.Values
                 Try
                     brush.Dispose()
                 Catch ex As Exception
