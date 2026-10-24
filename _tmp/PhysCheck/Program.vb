@@ -107,19 +107,41 @@ Module Program
         Check(sim.FingerBodies.Count = 2, "2 gripper fingers created")
         Check(sim.Objects.Count = 12, "12 default blocks spawned")
 
-        ' ---- 诊断：先关掉全部伺服，看关节是否还会自发高速旋转 ----
+        ' ---- 诊断 ----
+        For Each item In sim.RevoluteJoints
+            Console.WriteLine($"    joint {item.Label}: angle={item.Position:F6} speed={item.Speed:F6} axisErr={item.AxisError:E2} anchorErr={Vector3Math.Length(item.Point.AnchorError):E2}")
+        Next
+
+        For Each item In sim.JointServos
+            Console.WriteLine($"    servo {item.Label}: kp={item.Stiffness:F1} kd={item.Damping:F3} fmax={item.MaxForce:F1} vmax={item.MaxVelocity:F2}")
+        Next
+
+        For Each value As Double In sim.JointInertias
+            Console.WriteLine($"    inertia={value:E3}")
+        Next
+
+        Dim names3 As String() = {"link4", "link5", "link6"}
+
+        For Each name3 As String In names3
+            Dim b = sim.LinkBodies(name3)
+            Console.WriteLine($"    {name3}: m={b.Mass:F2} I=({b.InertiaLocal.m11:E2},{b.InertiaLocal.m22:E2},{b.InertiaLocal.m33:E2}) pos=({b.Position.x:F3},{b.Position.y:F3},{b.Position.z:F3})")
+        Next
+
+        For Each bf In sim.FingerBodies
+            Console.WriteLine($"    {bf.Label}: m={bf.Mass:F2} I=({bf.InertiaLocal.m11:E2},{bf.InertiaLocal.m22:E2},{bf.InertiaLocal.m33:E2}) pos=({bf.Position.x:F3},{bf.Position.y:F3},{bf.Position.z:F3})")
+        Next
+
         Console.WriteLine("  -- diagnostics: servos disabled --")
 
-        Dim probes As List(Of Double) = sim.JointServos.Select(Function(s) s.Stiffness).ToList()
         For Each servo In sim.JointServos
-            servo.Mode = VirtualWorkshop.Simulation.ServoMode3D.Disabled
+            servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Disabled
         Next
 
         sim.StepOnce()
         Console.WriteLine($"    free step1: q4={sim.RevoluteJoints(3).Position:F4} v4={sim.RevoluteJoints(3).Speed:F4} v2={sim.RevoluteJoints(1).Speed:F4} anchorErr4={Vector3Math.Length(sim.RevoluteJoints(3).Point.AnchorError):E3}")
 
         For Each servo In sim.JointServos
-            servo.Mode = VirtualWorkshop.Simulation.ServoMode3D.Position
+            servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Position
         Next
 
         Call sim.Reset()
@@ -143,6 +165,46 @@ Module Program
         Console.WriteLine($"  tcp=({state.Tcp(0):F3}, {state.Tcp(1):F3}, {state.Tcp(2):F3})  collisions={state.Collisions.Count}")
         Check(state.Q.All(Function(v) Math.Abs(v) < 0.12), "arm holds the zero pose under gravity")
 
+        ' ---- 直接给 j1 施加恒定扭矩，验证关节能否转动 ----
+        For Each servo In sim.JointServos
+            servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Disabled
+        Next
+
+        For k As Integer = 1 To 120
+            sim.RevoluteJoints(0).ApplyControlForce(20.0)
+            sim.StepOnce()
+        Next
+
+        Console.WriteLine($"  forced j1: angle={sim.RevoluteJoints(0).Position:F4} speed={sim.RevoluteJoints(0).Speed:F4}")
+
+        sim.LinkBodies("link1").AngularVelocity = New Vector3(0, 0, 5)
+
+        For k As Integer = 1 To 10
+            sim.StepOnce()
+        Next
+
+        Console.WriteLine($"  yaw omega after 10 steps: {sim.LinkBodies("link1").AngularVelocity.z:F3} angle={sim.RevoluteJoints(0).Position:F4}")
+
+        ' 只保留 j1 一个约束，排除其它关节/手指的耦合
+        While sim.World.Constraints.Count > 1
+            sim.World.Constraints.RemoveAt(sim.World.Constraints.Count - 1)
+        End While
+
+        sim.LinkBodies("link1").AngularVelocity = New Vector3(0, 0, 5)
+
+        For k As Integer = 1 To 10
+            sim.StepOnce()
+        Next
+
+        Console.WriteLine($"  yaw omega (only j1): {sim.LinkBodies("link1").AngularVelocity.z:F3} angle={sim.RevoluteJoints(0).Position:F4}")
+
+        For Each servo In sim.JointServos
+            servo.Mode = Microsoft.VisualBasic.Engine.Physics.Joints3D.ServoMode3D.Position
+        Next
+
+        Call sim.Reset()
+        Call sim.SetServoEnabled(True)
+
         Dim hardware As New VirtualWorkshop.Simulation.ArmHardware(sim)
         Dim command = hardware.MoveJ({0.3, -0.2, 0.4, 0.0, 0.4, 0.0}, 0.6)
 
@@ -150,6 +212,15 @@ Module Program
 
         For i As Integer = 1 To 480
             hardware.Tick()
+
+            If i Mod 120 = 0 Then
+                Dim act = hardware.ActiveMotion
+                Console.WriteLine($"    tick {i} t={sim.Time:F2} active={act IsNot Nothing}")
+                Console.WriteLine($"      targets=({String.Join(", ", sim.JointServos.Select(Function(s) s.Target.ToString("F2")))})")
+                Console.WriteLine($"      pos=({String.Join(", ", sim.RevoluteJoints.Select(Function(j) (j.Position).ToString("F2")))})")
+                Console.WriteLine($"      spd=({String.Join(", ", sim.RevoluteJoints.Select(Function(j) (j.Speed).ToString("F2")))})")
+                Console.WriteLine($"      frc=({String.Join(", ", sim.JointServos.Select(Function(s) (s.LastForce).ToString("F1")))})")
+            End If
         Next
 
         Dim moved = hardware.State

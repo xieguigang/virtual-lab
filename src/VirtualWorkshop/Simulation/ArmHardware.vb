@@ -117,7 +117,10 @@ Namespace Simulation
 
             If progress > 1.0 Then progress = 1.0
 
-            Dim q As Double() = InterpolateAt(_active, progress)
+            ' 余弦缓动（smoothstep）：起停阶段的速度与加速度都连续，
+            ' 否则线性插值会在起步/停止瞬间给腕部一个冲击
+            Dim eased As Double = progress * progress * (3.0 - 2.0 * progress)
+            Dim q As Double() = InterpolateAt(_active, eased)
 
             If q IsNot Nothing Then
                 Call Simulation.SetJointTargets(q)
@@ -129,7 +132,8 @@ Namespace Simulation
                 _active.Finished = True
 
                 If gapError > 0.25 Then
-                    _active.Message = $"到位误差偏大 ({gapError:F3} rad)"
+                    _active.Failed = True
+                    _active.Message = $"到位误差偏大 ({gapError:F3} rad)，可能被碰撞阻挡"
                 Else
                     _active.Message = "ok"
                 End If

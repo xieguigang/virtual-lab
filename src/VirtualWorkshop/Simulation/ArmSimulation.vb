@@ -12,7 +12,11 @@ Namespace Simulation
         Public Property Gravity As Double = 9.81
         Public Property EnableGravity As Boolean = True
         Public Property StepsPerSecond As Double = 120.0
-        Public Property Substeps As Integer = 4
+        ''' <summary>
+        ''' 每个固定步内的子步数。子步长越小，速度环增益的稳定上限越高
+        ''' （<c>Kd &lt; 2·I/dt</c>），六轴臂的重力前馈刚度也就越足。
+        ''' </summary>
+        Public Property Substeps As Integer = 8
         Public Property Iterations As Integer = 20
 
         ''' <summary>
@@ -20,14 +24,26 @@ Namespace Simulation
         ''' </summary>
         ''' <remarks>
         ''' 位置环 × 速度环的乘积就是等效的力矩刚度。六轴臂在零位时 j2 需要
-        ''' 约 15 N·m 才能撑住前臂，若刚度不足就会出现明显的重力下垂：
-        ''' <c>40 × 25 = 1000 N·m/rad</c> 把静差压到 0.015 rad（≈0.9°）。
+        ''' 约 15 N·m 才能撑住前臂。速度环增益被"自身惯量 / 子步长"的稳定性条件卡住
+        ''' （见 <c>EstimateJointInertia</c>），所以刚度只能靠提高位置环增益来补：
+        ''' <c>200 × 5.5 ≈ 1100 N·m/rad</c> 把 j2 的静差压到 0.013 rad（≈0.8°）。
         ''' </remarks>
-        Public Property ServoStiffness As Double = 40.0
+        Public Property ServoStiffness As Double = 200.0
         ''' <summary>位置伺服的阻尼（速度环增益，N·m/(rad/s)）。</summary>
         Public Property ServoDamping As Double = 25.0
         ''' <summary>关节速度上限的缩放（相对 URDF 的 velocity）。</summary>
         Public Property VelocityScale As Double = 0.8
+
+        ''' <summary>
+        ''' 折算到连杆上的电机/减速器转子惯量（kg·m²），加到每个连杆的主惯量上。
+        ''' </summary>
+        ''' <remarks>
+        ''' URDF 给的只是连杆本身的惯量：腕部三个轴只有 1e-4 量级，在 120 Hz 的仿真步长下
+        ''' 伺服带宽被稳定性条件卡得很低，快速运动会把末端"甩"出接近 1 rad 的漂移。
+        ''' 真实机械臂的谐波减速器（1:50~1:100）会把电机转子惯量折算放大到连杆侧，
+        ''' 所以这里加一个球形转子惯量，既符合硬件事实，也让腕部在物理上站得住。
+        ''' </remarks>
+        Public Property MotorInertia As Double = 0.002
 
         ''' <summary>夹爪最大夹持力（N）。</summary>
         Public Property GripperMaxForce As Double = 60.0
@@ -79,6 +95,9 @@ Namespace Simulation
         Public ReadOnly Property JointServos As New List(Of JointServo3D)()
 
         Public ReadOnly Property JointDefs As New List(Of ArmJointDef)()
+
+        ''' <summary>每个关节的有效惯量估算（调试用）。</summary>
+        Public ReadOnly Property JointInertias As New List(Of Double)()
 
         ''' <summary>两根手指的刚体（顺序与 <see cref="FingerNames"/> 一致）。</summary>
         Public ReadOnly Property FingerBodies As New List(Of RigidBody3D)()
@@ -141,6 +160,7 @@ Namespace Simulation
             Call RevoluteJoints.Clear()
             Call JointServos.Clear()
             Call JointDefs.Clear()
+            Call JointInertias.Clear()
             Call FingerBodies.Clear()
             Call FingerJoints.Clear()
             Call FingerServos.Clear()
@@ -186,8 +206,12 @@ Namespace Simulation
                 _world.Add(body)
             Next
 
+            ' ---- 夹爪（先建，关节的惯量估算要把手指算进下游质量）----
+            Call BuildGripper(poses)
+
             ' ---- 关节 + 伺服 ----
-            For Each definition As ArmJointDef In Assembly.Joints
+            For i As Integer = 0 To Assembly.Joints.Count - 1
+                Dim definition As ArmJointDef = Assembly.Joints(i)
                 Dim parentBody As RigidBody3D = Nothing
                 Dim childBody As RigidBody3D = Nothing
 
@@ -211,14 +235,19 @@ Namespace Simulation
                 Dim maxVelocity As Double = System.Math.Max(0.2, definition.Velocity * Options.VelocityScale)
                 Dim maxForce As Double = System.Math.Max(1.0, definition.Effort)
 
-                ' 速度环增益必须与"力矩上限 / 速度上限"匹配：若增益远超
-                ' MaxForce/(MaxVelocity)，一点速度误差就让输出饱和，伺服退化成
-                ' 开关控制并出现极限环（实测末三轴会持续抖动 ±0.2 rad）。
-                Dim damping As Double = System.Math.Min(
-                    Options.ServoDamping,
-                    maxForce / maxVelocity * 0.5)
+                ' 速度环增益必须按"关节有效惯量"限幅：显式积分下 Kd·dt/I 超过 2 就会发散。
+                ' 末三轴（j4/j5/j6）的等效惯量只有 1e-3 量级，若沿用统一的 25 N·m/(rad/s)，
+                ' 一步之内速度就被反向 30 倍，表现为 ±1 rad 的低频摆动。
+                Dim inertia As Double = EstimateJointInertia(i)
+                Dim substepDt As Double = 1.0 / (System.Math.Max(30.0, Options.StepsPerSecond) * System.Math.Max(1, Options.Substeps))
+                Dim dampingLimit As Double = 0.7 * 2.0 * inertia / substepDt
 
-                damping = System.Math.Max(0.5, damping)
+                JointInertias.Add(inertia)
+
+                Dim damping As Double = System.Math.Min(Options.ServoDamping,
+                                                        System.Math.Min(dampingLimit, maxForce / maxVelocity))
+
+                damping = System.Math.Max(0.05, damping)
 
                 Dim servo As New JointServo3D(joint, ServoMode3D.Position) With {
                     .Target = 0.0,
@@ -234,14 +263,39 @@ Namespace Simulation
                 JointServos.Add(servo)
             Next
 
-            ' ---- 夹爪 ----
-            Call BuildGripper(poses)
-
             ' ---- 默认积木 ----
             If Options.SpawnDefaultBlocks Then
                 Call SpawnDefaultBlocks()
             End If
         End Sub
+
+        ''' <summary>
+        ''' 关节自身的转动惯量（子连杆沿关节轴的主惯量）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 这里刻意取"被驱动刚体自身"的惯量，而不是"关节下游的等效惯量"：
+        ''' 伺服力矩先进入子连杆，与下游的耦合要等约束求解器在**同一子步内更晚**才传递，
+        ''' 对显式积分来说，稳定性取决于前者（<c>Kd·dt/I_self</c>）。
+        ''' 用等效惯量会把阻尼放大 5~10 倍，实测让 j3 在假平衡点上持续振荡。
+        ''' </remarks>
+        Private Function EstimateJointInertia(index As Integer) As Double
+            If index < 0 OrElse index >= Assembly.Joints.Count Then Return 1.0E-4
+
+            Dim definition As ArmJointDef = Assembly.Joints(index)
+            Dim body As RigidBody3D = Nothing
+
+            If Not LinkBodies.TryGetValue(definition.ChildLink, body) Then Return 1.0E-4
+
+            Dim axis As Vector3 = Vector3Math.Normalize(definition.Axis)
+            Dim along As Double = Vector3Math.Dot(axis, body.InertiaLocal.MultiplyLeft(axis))
+
+            If along <= 0.0 OrElse Double.IsNaN(along) Then
+                along = System.Math.Max(body.InertiaLocal.m11,
+                                        System.Math.Max(body.InertiaLocal.m22, body.InertiaLocal.m33))
+            End If
+
+            Return System.Math.Max(along, 1.0E-6)
+        End Function
 
         Private Function CreateLinkBody(link As UrdfLink, poses As Dictionary(Of String, Pose3D)) As RigidBody3D
             Dim pose As Pose3D = Assembly.BodyPose(poses, link.Name)
@@ -263,9 +317,14 @@ Namespace Simulation
             body.LinearDamping = 0.0
             body.MaxAngularSpeed = 25.0
 
-            ' 用 URDF 给出的主惯量替换均匀盒惯量
+            ' 用 URDF 给出的主惯量替换均匀盒惯量，再叠加折算到连杆侧的转子惯量
             If link.Inertia IsNot Nothing AndAlso link.Inertia.x > 0 AndAlso link.Inertia.y > 0 AndAlso link.Inertia.z > 0 Then
-                body.InertiaLocal = Matrix3x3.Diagonal(link.Inertia.x, link.Inertia.y, link.Inertia.z)
+                Dim motor As Double = System.Math.Max(0.0, Options.MotorInertia)
+
+                body.InertiaLocal = Matrix3x3.Diagonal(
+                    link.Inertia.x + motor,
+                    link.Inertia.y + motor,
+                    link.Inertia.z + motor)
                 Call body.InvalidateInertiaCache()
             End If
 
