@@ -75,7 +75,7 @@ Namespace Model
         Public Function Load(file As String, linkNames As IEnumerable(Of String),
                              Optional validateWithLandscape As Boolean = True) As GlbScene
 
-            If String.IsNullOrEmpty(file) OrElse Not File.Exists(file) Then
+            If String.IsNullOrEmpty(file) OrElse Not System.IO.File.Exists(file) Then
                 Throw New FileNotFoundException("找不到模型文件: " & file, file)
             End If
 
@@ -341,7 +341,7 @@ Namespace Model
         Private Function ReadContainer(file As String) As GlbContainer
             Dim container As New GlbContainer()
 
-            Using stream As FileStream = File.OpenRead(file)
+            Using stream As FileStream = System.IO.File.OpenRead(file)
                 Using reader As New BinaryReader(stream, Encoding.UTF8, leaveOpen:=False)
                     If stream.Length < 12 Then
                         Throw New InvalidDataException("不是有效的 GLB 文件（长度不足）: " & file)

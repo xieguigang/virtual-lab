@@ -1,6 +1,7 @@
 Imports System.Globalization
 Imports System.IO
 Imports System.Xml.Linq
+Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 
 Namespace Model
@@ -284,9 +285,9 @@ Namespace Model
         Private Shared Function Child(element As XElement, localName As String) As XElement
             If element Is Nothing Then Return Nothing
 
-            For Each child As XElement In element.Elements()
-                If String.Equals(child.Name.LocalName, localName, StringComparison.OrdinalIgnoreCase) Then
-                    Return child
+            For Each item As XElement In element.Elements()
+                If String.Equals(item.Name.LocalName, localName, StringComparison.OrdinalIgnoreCase) Then
+                    Return item
                 End If
             Next
 

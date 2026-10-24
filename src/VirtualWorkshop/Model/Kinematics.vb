@@ -1,3 +1,4 @@
+Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 
 Namespace Model
@@ -12,7 +13,7 @@ Namespace Model
         Public Property Iterations As Integer
         Public Property Message As String
 
-        Public ReadOnly Property Error As Double
+        Public ReadOnly Property TotalError As Double
             Get
                 Return System.Math.Sqrt(PositionError * PositionError + RotationError * RotationError)
             End Get
@@ -101,27 +102,27 @@ Namespace Model
                     Dim probe(n - 1) As Double
                     Array.Copy(q, probe, n)
 
-                    Dim step As Double = FiniteStep
+                    Dim deltaStep As Double = FiniteStep
 
-                    If probe(j) + step > upper(j) Then
-                        step = -step
+                    If probe(j) + deltaStep > upper(j) Then
+                        deltaStep = -deltaStep
                     End If
 
-                    probe(j) = probe(j) + step
+                    probe(j) = probe(j) + deltaStep
 
                     Dim moved As Pose3D = assembly.TcpPose(probe)
-                    Dim deltaPosition As Vector3 = (moved.Position - current.Position) * (1.0 / step)
+                    Dim deltaPosition As Vector3 = (moved.Position - current.Position) * (1.0 / deltaStep)
                     Dim deltaRotation As Vector3 = RotationVectorBetween(current.Rotation, moved.Rotation)
-                    deltaRotation = deltaRotation * (1.0 / step)
+                    deltaRotation = deltaRotation * (1.0 / deltaStep)
 
-                    jac.Set(0, j, deltaPosition.x)
-                    jac.Set(1, j, deltaPosition.y)
-                    jac.Set(2, j, deltaPosition.z)
+                    jac.Put(0, j, deltaPosition.x)
+                    jac.Put(1, j, deltaPosition.y)
+                    jac.Put(2, j, deltaPosition.z)
 
                     If Not positionOnly Then
-                        jac.Set(3, j, deltaRotation.x)
-                        jac.Set(4, j, deltaRotation.y)
-                        jac.Set(5, j, deltaRotation.z)
+                        jac.Put(3, j, deltaRotation.x)
+                        jac.Put(4, j, deltaRotation.y)
+                        jac.Put(5, j, deltaRotation.z)
                     End If
                 Next
 
@@ -148,7 +149,7 @@ Namespace Model
                         Dim sum As Double = 0.0
 
                         For r As Integer = 0 To rows - 1
-                            sum += jac.Item(r, i) * jac.Item(r, k)
+                            sum += jac.Value(r, i) * jac.Value(r, k)
                         Next
 
                         a(i, k) = sum
@@ -157,7 +158,7 @@ Namespace Model
                     Dim rhsValue As Double = 0.0
 
                     For r As Integer = 0 To rows - 1
-                        rhsValue += jac.Item(r, i) * residual(r)
+                        rhsValue += jac.Value(r, i) * residual(r)
                     Next
 
                     b(i) = rhsValue
@@ -251,11 +252,11 @@ Namespace Model
                 ReDim _data(rows - 1, cols - 1)
             End Sub
 
-            Public Sub Set(row As Integer, col As Integer, value As Double)
+            Public Sub Put(row As Integer, col As Integer, value As Double)
                 _data(row, col) = value
             End Sub
 
-            Public Function Item(row As Integer, col As Integer) As Double
+            Public Function Value(row As Integer, col As Integer) As Double
                 Return _data(row, col)
             End Function
         End Class

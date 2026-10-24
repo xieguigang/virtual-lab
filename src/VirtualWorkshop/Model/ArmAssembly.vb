@@ -1,3 +1,5 @@
+Imports System.IO
+Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 
 Namespace Model
@@ -134,7 +136,7 @@ Namespace Model
             poses(BaseLink) = Pose3D.Identity()
 
             For Each joint As ArmJointDef In Joints
-                Dim parent As Pose3D
+                Dim parent As Pose3D = Pose3D.Identity()
 
                 If Not poses.TryGetValue(joint.ParentLink, parent) Then
                     Continue For
@@ -163,7 +165,7 @@ Namespace Model
         ''' <summary>由关节角计算 TCP 的世界位姿。</summary>
         Public Function TcpPose(q As Double()) As Pose3D
             Dim poses As Dictionary(Of String, Pose3D) = ForwardKinematics(q)
-            Dim last As Pose3D
+            Dim last As Pose3D = Pose3D.Identity()
 
             If String.IsNullOrEmpty(TcpLink) OrElse Not poses.TryGetValue(TcpLink, last) Then
                 Return Pose3D.Identity()
@@ -174,7 +176,7 @@ Namespace Model
 
         ''' <summary>由关节角计算 TCP 的世界位姿。</summary>
         Public Function TcpPose(poses As Dictionary(Of String, Pose3D)) As Pose3D
-            Dim last As Pose3D
+            Dim last As Pose3D = Pose3D.Identity()
 
             If String.IsNullOrEmpty(TcpLink) OrElse Not poses.TryGetValue(TcpLink, last) Then
                 Return Pose3D.Identity()
@@ -197,7 +199,7 @@ Namespace Model
         ''' 刚体原点 = link 位姿作用在惯量原点上。
         ''' </summary>
         Public Function BodyPose(poses As Dictionary(Of String, Pose3D), linkName As String) As Pose3D
-            Dim pose As Pose3D
+            Dim pose As Pose3D = Pose3D.Identity()
 
             If Not poses.TryGetValue(linkName, pose) Then Return Pose3D.Identity()
 
