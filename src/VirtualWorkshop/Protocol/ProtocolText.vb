@@ -50,6 +50,7 @@ Namespace Protocol
         Public Const ErrEstop As String = "estop_active"
         Public Const ErrIkUnreachable As String = "ik_unreachable"
         Public Const ErrJointLimit As String = "joint_limit"
+        Public Const ErrGroundViolation As String = "ground_violation"
         Public Const ErrBusy As String = "busy"
         Public Const ErrTimeout As String = "timeout"
         Public Const ErrNotFound As String = "not_found"

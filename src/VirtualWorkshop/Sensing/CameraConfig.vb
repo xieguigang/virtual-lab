@@ -32,14 +32,24 @@ Namespace Sensing
         ''' <summary>相机光心在 link6 局部系中的位置。</summary>
         Public Property Offset As New Vector3(0.045, 0.0, 0.0)
 
-        ''' <summary>环境光强度（0~1），其余部分由单方向光提供。</summary>
-        Public Property Ambient As Double = 0.35
+        ''' <summary>
+        ''' 环境光强度（0~1），其余部分由单方向光提供。
+        ''' </summary>
+        ''' <remarks>
+        ''' 浅色背景下手指的深色材质（Rubber）容易糊成纯黑，取 0.45 保留一点层次。
+        ''' </remarks>
+        Public Property Ambient As Double = 0.45
 
         ''' <summary>超过这个距离的三角形直接丢弃（米）。</summary>
         Public Property MaxDistance As Double = 6.0
 
-        ''' <summary>背景颜色（0xRRGGBB），与三维视口保持一致。</summary>
-        Public Property BackgroundColor As Integer = &HB0F14
+        ''' <summary>
+        ''' 背景颜色（0xRRGGBB），与三维视口保持一致（slate-50）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 注意 VB 里 <c>&amp;HB0F14</c> 就是 0x0B0F14，写十六进制字面量时别漏了前导位。
+        ''' </remarks>
+        Public Property BackgroundColor As Integer = &HF8FAFC
 
         Public ReadOnly Property Pixels As Integer
             Get

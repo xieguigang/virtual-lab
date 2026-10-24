@@ -98,7 +98,7 @@ Partial Class FormVirtualLab
             .BackColor = Color.Transparent
         }
 
-        Me.m_btnStart = UiTheme.CreateButton("启动服务", UiTheme.Good)
+        Me.m_btnStart = UiTheme.CreatePrimaryButton("启动服务", 92)
         Me.m_btnStopServer = UiTheme.CreateButton("停止服务", UiTheme.Warn)
         Me.m_btnEnable = UiTheme.CreateButton("伺服使能", UiTheme.Accent)
         Me.m_btnHome = UiTheme.CreateButton("回零", UiTheme.Accent)
@@ -153,7 +153,7 @@ Partial Class FormVirtualLab
         ' ---------------- 右侧仪表面板 ----------------
         Me.m_side.Dock = DockStyle.Right
         Me.m_side.Width = 386
-        Me.m_side.BackColor = UiTheme.Background
+        Me.m_side.BackColor = UiTheme.PanelColor
         Me.m_side.Padding = New Padding(8)
 
         ' 用 FlowLayoutPanel 而不是 Panel：Dock=Top 的卡片在 Panel 里会被压缩，
@@ -369,7 +369,7 @@ Partial Class FormVirtualLab
 
         ' ---------------- 三维视口 ----------------
         Me.m_viewport.Dock = DockStyle.Fill
-        Me.m_viewport.BackColor = Color.Black
+        Me.m_viewport.BackColor = UiTheme.ViewportBackground
         Me.m_viewport.Padding = New Padding(0)
 
         Me.m_canvas.Dock = DockStyle.Fill

@@ -143,13 +143,57 @@ Namespace Simulation
         ''' <summary>最近一次 Step 时检测到的接触对（已去重）。</summary>
         Public ReadOnly Property LastCollisions As New List(Of String)()
 
+        ''' <summary>
+        ''' 最近一次子步里"插进地面"的机械臂部件（形如 <c>link3|ground</c>）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 运动学与动力学两种模式下机械臂都是静态刚体（kinematic 驱动），
+        ''' 而物理引擎不做静态-静态碰撞，所以地面穿透必须自己算：取连杆碰撞盒的 8 个角点，
+        ''' 只要有角点低于 <see cref="GroundZ"/> 就算穿地。
+        ''' </remarks>
+        Public ReadOnly Property GroundContacts As New List(Of String)()
+
+        ''' <summary>地面高度（世界 Z），机械臂基座底面就在这个高度。</summary>
+        Public Property GroundZ As Double = 0.0
+
+        ''' <summary>连杆允许的最低离地间隙（米），小于它就判定为撞地。</summary>
+        Public Property GroundClearance As Double = 0.002
+
+        ''' <summary>
+        ''' 手指允许的最低离地间隙（米）。
+        ''' </summary>
+        ''' <remarks>夹爪要能夹起躺在地面上的积木，所以手指允许贴到地面。</remarks>
+        Public Property FingerClearance As Double = 0.0
+
         Private _jointQ As Double()
         Private _jointQd As Double()
         Private _previousQ As Double()
         Private _fingerExtension As Double
         Private _fingerTarget As Double
         Private _gripForce As Double
+
+        ''' <summary>手指压到物体后允许再挤入的最大深度（米，两侧合计）。</summary>
+        ''' <remarks>
+        ''' 只要超过 <c>Slop</c>(2 mm)，接触求解器就会产生法向冲量与摩擦；取 4 mm 既能夹住
+        ''' 32 mm 的积木，又不会让 Baumgarte 偏置速度大到把积木弹飞。
+        ''' </remarks>
+        Private Const MaxFingerSqueeze As Double = 0.004
+
+        ''' <summary>手指是否已经压到了物体（用的是上一步的接触信息）。</summary>
+        Private _fingerContact As Boolean
+
+        ''' <summary>刚接触到物体时的手指行程，挤入深度以它为基准。</summary>
+        Private _fingerContactExtension As Double
+
+        ''' <summary>本次夹紧允许的挤入深度（由夹持力决定）。</summary>
+        Private _fingerSqueeze As Double
         Private ReadOnly _fingerCenters As New List(Of Vector3)()
+
+        ''' <summary>各连杆碰撞盒的局部尺寸（来自 URDF collision box）。</summary>
+        Private ReadOnly _linkBoxes As New Dictionary(Of String, Vector3)(StringComparer.OrdinalIgnoreCase)
+
+        ''' <summary>手指碰撞盒的尺寸，与 <see cref="FingerBodies"/> 一一对应。</summary>
+        Private ReadOnly _fingerBoxes As New List(Of Vector3)()
         Private ReadOnly _fingerAxes As New List(Of Vector3)()
 
         ''' <summary>当前关节角（运动学模式下的真实值）。</summary>
@@ -199,6 +243,9 @@ Namespace Simulation
             Call _fingerAxes.Clear()
             Call Objects.Clear()
             Call LastCollisions.Clear()
+            Call GroundContacts.Clear()
+            Call _linkBoxes.Clear()
+            Call _fingerBoxes.Clear()
 
             Time = 0.0
             StepCount = 0
@@ -372,6 +419,12 @@ Namespace Simulation
                 Call body.SetStatic()
             End If
 
+            ' 记下碰撞盒尺寸：地面穿透检测要用它算 8 个角点的世界高度
+            _linkBoxes(link.Name) = New Vector3(
+                System.Math.Max(0.005, size.x),
+                System.Math.Max(0.005, size.y),
+                System.Math.Max(0.005, size.z))
+
             Return body
         End Function
 
@@ -425,6 +478,7 @@ Namespace Simulation
                 _world.Add(body)
                 FingerBodies.Add(body)
                 FingerNames.Add(fingerName)
+                _fingerBoxes.Add(size)
                 centers.Add(center)
                 _fingerCenters.Add(center)
 
@@ -479,6 +533,13 @@ Namespace Simulation
         Public Sub StepOnce()
             If _world Is Nothing Then Return
 
+            ' 手指必须在物理步进**之前**就摆到本步的位置：
+            ' 之前放在 Step 之后，接触检测用的是上一帧的手指姿态，
+            ' 夹爪闭合时永远"慢一拍"，压到积木的那一步检测不到接触
+            If Options.KinematicArm Then
+                Call UpdateFingerMotion()
+            End If
+
             Call _world.Step(_world.FixedDt)
 
             Time += _world.FixedDt
@@ -486,9 +547,9 @@ Namespace Simulation
 
             If Options.KinematicArm Then
                 Call UpdateKinematicSpeeds()
-                Call UpdateFingerMotion()
             End If
 
+            Call DetectGroundContacts()
             Call RefreshCollisions()
         End Sub
 
@@ -505,10 +566,131 @@ Namespace Simulation
             Next
         End Sub
 
+        ''' <summary>
+        ''' 检测机械臂（连杆 + 手指）是否插进了地面。
+        ''' </summary>
+        ''' <remarks>
+        ''' 不能依赖物理引擎的接触：机械臂在两种模式下都是静态刚体，
+        ''' 而 <c>BroadPhase3D</c> 会跳过 static-static 配对，连杆与地面之间根本不会产生
+        ''' <see cref="Manifold3D"/>。所以这里直接用碰撞盒的 8 个角点与地面高度比较。
+        ''' </remarks>
+        Private Sub DetectGroundContacts()
+            Call GroundContacts.Clear()
+
+            Dim baseName As String = If(Assembly?.BaseLink, "")
+
+            For Each pair As KeyValuePair(Of String, RigidBody3D) In LinkBodies
+                Dim name As String = pair.Key
+
+                ' 基座本来就坐在地面上，不算碰撞
+                If baseName.Length > 0 AndAlso String.Equals(name, baseName, StringComparison.OrdinalIgnoreCase) Then Continue For
+
+                Dim size As Vector3 = Nothing
+
+                If Not _linkBoxes.TryGetValue(name, size) Then Continue For
+
+                Dim lowest As Double = LowestBoxZ(pair.Value.Position, pair.Value.Orientation, size)
+
+                If lowest < GroundZ + GroundClearance Then
+                    GroundContacts.Add(name & "|ground")
+                End If
+            Next
+
+            For i As Integer = 0 To FingerBodies.Count - 1
+                If i >= _fingerBoxes.Count Then Continue For
+
+                Dim body As RigidBody3D = FingerBodies(i)
+                Dim lowest As Double = LowestBoxZ(body.Position, body.Orientation, _fingerBoxes(i))
+
+                If lowest < GroundZ + FingerClearance Then
+                    Dim label As String = If(i < FingerNames.Count, FingerNames(i), "Finger")
+
+                    GroundContacts.Add(label & "|ground")
+                End If
+            Next
+        End Sub
+
+        ''' <summary>
+        ''' 给定关节角，预测哪个连杆会插进地面；不会插入则返回 <c>Nothing</c>。
+        ''' </summary>
+        ''' <param name="q">候选关节角（弧度）</param>
+        ''' <returns>第一个会穿地的连杆名</returns>
+        ''' <remarks>用于运动指令的事前校验与插值过程中的前瞻，让机械臂根本不会下探到地面以下。</remarks>
+        Public Function GroundViolation(q As Double()) As String
+            If q Is Nothing OrElse Assembly Is Nothing OrElse _linkBoxes.Count = 0 Then Return Nothing
+
+            Dim baseName As String = If(Assembly.BaseLink, "")
+            Dim poses As Dictionary(Of String, Pose3D) = Assembly.ForwardKinematics(q)
+
+            For Each pair As KeyValuePair(Of String, Vector3) In _linkBoxes
+                If baseName.Length > 0 AndAlso String.Equals(pair.Key, baseName, StringComparison.OrdinalIgnoreCase) Then Continue For
+
+                Dim pose As Pose3D = Assembly.BodyPose(poses, pair.Key)
+                Dim lowest As Double = LowestBoxZ(pose.Position, pose.Rotation, pair.Value)
+
+                If lowest < GroundZ + GroundClearance Then Return pair.Key
+            Next
+
+            Return Nothing
+        End Function
+
+        ''' <summary>盒体（以 center 为中心、随 rotation 旋转）8 个角点里最低的那个世界 Z。</summary>
+        Public Shared Function LowestBoxZ(center As Vector3, rotation As Quaternion, size As Vector3) As Double
+            Dim halfX As Double = size.x * 0.5
+            Dim halfY As Double = size.y * 0.5
+            Dim halfZ As Double = size.z * 0.5
+            Dim lowest As Double = Double.MaxValue
+
+            For sx As Integer = -1 To 1 Step 2
+                For sy As Integer = -1 To 1 Step 2
+                    For sz As Integer = -1 To 1 Step 2
+                        Dim corner As New Vector3(sx * halfX, sy * halfY, sz * halfZ)
+                        Dim world As Vector3 = center + rotation.Rotate(corner)
+
+                        If world.z < lowest Then lowest = world.z
+                    Next
+                Next
+            Next
+
+            Return lowest
+        End Function
+
+        ''' <summary>机械臂（含手指）当前最低点的世界 Z，用于诊断与自检。</summary>
+        Public Function LowestArmZ() As Double
+            Dim lowest As Double = Double.MaxValue
+            Dim baseName As String = If(Assembly?.BaseLink, "")
+
+            For Each pair As KeyValuePair(Of String, RigidBody3D) In LinkBodies
+                If baseName.Length > 0 AndAlso String.Equals(pair.Key, baseName, StringComparison.OrdinalIgnoreCase) Then Continue For
+
+                Dim size As Vector3 = Nothing
+
+                If Not _linkBoxes.TryGetValue(pair.Key, size) Then Continue For
+
+                lowest = System.Math.Min(lowest, LowestBoxZ(pair.Value.Position, pair.Value.Orientation, size))
+            Next
+
+            For i As Integer = 0 To FingerBodies.Count - 1
+                If i >= _fingerBoxes.Count Then Continue For
+
+                Dim body As RigidBody3D = FingerBodies(i)
+
+                lowest = System.Math.Min(lowest, LowestBoxZ(body.Position, body.Orientation, _fingerBoxes(i)))
+            Next
+
+            Return If(lowest = Double.MaxValue, GroundZ, lowest)
+        End Function
+
         Private Sub RefreshCollisions()
             Call LastCollisions.Clear()
 
             Dim seen As New HashSet(Of String)(StringComparer.Ordinal)
+
+            ' 机械臂与地面之间靠几何检测（物理引擎不做静态-静态碰撞），
+            ' 这里合并进同一份接触列表，状态里就能看到 "link3|ground"
+            For Each key As String In GroundContacts
+                If seen.Add(key) Then LastCollisions.Add(key)
+            Next
 
             For Each manifold As Manifold3D In _world.Contacts
                 Dim a As String = If(manifold.A?.Label, "")
@@ -522,6 +704,34 @@ Namespace Simulation
                     LastCollisions.Add(key)
                 End If
             Next
+
+            Call UpdateFingerContact()
+        End Sub
+
+        ''' <summary>
+        ''' 从接触对里判断手指是否压到了积木，并记录接触瞬间的手指行程。
+        ''' </summary>
+        ''' <remarks>
+        ''' 只看手指与积木的配对（手指碰地面不算），接触对写法是
+        ''' <c>Finger_L|block-3</c> 或 <c>block-3|Finger_L</c>。
+        ''' </remarks>
+        Private Sub UpdateFingerContact()
+            Dim touching As Boolean = False
+
+            For Each text As String In LastCollisions
+                If String.IsNullOrEmpty(text) Then Continue For
+                If text.IndexOf("Finger", StringComparison.OrdinalIgnoreCase) < 0 Then Continue For
+                If text.IndexOf("block-", StringComparison.OrdinalIgnoreCase) < 0 Then Continue For
+
+                touching = True
+                Exit For
+            Next
+
+            If touching AndAlso Not _fingerContact Then
+                _fingerContactExtension = _fingerExtension
+            End If
+
+            _fingerContact = touching
         End Sub
 
         ''' <summary>重建整个世界（场景复位）。</summary>
@@ -676,7 +886,24 @@ Namespace Simulation
 
             If System.Math.Abs(diff) < 1.0E-6 Then Return
 
-            _fingerExtension += System.Math.Max(-maxDelta, System.Math.Min(maxDelta, diff))
+            Dim move As Double = System.Math.Max(-maxDelta, System.Math.Min(maxDelta, diff))
+
+            ' 夹紧时一旦压到物体就只再挤入一点点：
+            ' 继续照着"最大行程"推会把积木压进去十几毫米，Baumgarte 偏置速度
+            ' 会达到几米每秒，积木不是被夹住而是被射出去
+            If diff > 0.0 AndAlso _gripForce > 0.0 AndAlso _fingerContact Then
+                Dim limit As Double = _fingerContactExtension + _fingerSqueeze
+
+                If _fingerExtension + move > limit Then
+                    move = limit - _fingerExtension
+
+                    If move < 0.0 Then move = 0.0
+                End If
+            End If
+
+            If System.Math.Abs(move) < 1.0E-9 Then Return
+
+            _fingerExtension += move
 
             Call ApplyKinematicPose()
         End Sub
@@ -749,9 +976,17 @@ Namespace Simulation
         ''' 夹紧：<paramref name="force"/> 是期望夹持力（N）。
         ''' </summary>
         ''' <remarks>
-        ''' 运动学模式下夹持力被映射成手指的闭合行程：力越大，手指压得越深，
-        ''' 接触求解器给出的法向力与库仑摩擦上限就越大。夹持力不足时积木会因为
-        ''' 重力超过摩擦力而真实地滑落，不需要额外的"抓取绑定"。
+        ''' <para>
+        ''' 运动学模式下手指是位置驱动的，所以夹持力被映射成"压到物体里多深"：
+        ''' 接触求解器的 Baumgarte 项会按 <c>bias = Baumgarte/dt * (穿透 − Slop)</c>
+        ''' 给出分离速度，穿透越深、法向冲量与库仑摩擦上限越大，也就夹得越紧。
+        ''' </para>
+        ''' <para>
+        ''' <b>关键</b>：这个深度必须被限制住。早期实现直接把手指推到最大行程，
+        ''' 夹 32 mm 的积木时会压进去 ~18 mm，bias 高达 3 m/s 量级——积木不是被夹住，
+        ''' 而是被"射"出去。现在改成：手指以有限速度闭合，一旦接触到物体就只再挤入
+        ''' <see cref="MaxFingerSqueeze"/> × 力比例 的深度（默认最多 4 mm）。
+        ''' </para>
         ''' </remarks>
         Public Sub Grip(force As Double)
             _gripForce = System.Math.Max(0.0, force)
@@ -763,6 +998,11 @@ Namespace Simulation
                 ratio = System.Math.Max(0.0, System.Math.Min(1.0, ratio))
 
                 _fingerTarget = GripperMaxExtension * ratio
+
+                ' 新的一次夹紧：重新记录接触时刻的行程
+                _fingerContact = False
+                _fingerContactExtension = 0.0
+                _fingerSqueeze = MaxFingerSqueeze * ratio
 
                 Return
             End If
@@ -780,6 +1020,7 @@ Namespace Simulation
 
             If Options.KinematicArm Then
                 _fingerTarget = -GripperOpenExtension
+                _fingerContact = False
 
                 Return
             End If

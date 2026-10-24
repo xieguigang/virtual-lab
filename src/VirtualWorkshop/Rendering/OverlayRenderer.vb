@@ -22,6 +22,18 @@ Namespace Rendering
         Public Property ShowAxes As Boolean = True
         Public Property ShowContacts As Boolean = True
 
+        ''' <summary>是否绘制地面网格（画在世界 Z = <see cref="UiTheme.GroundZ"/> 的平面上，也就是机械臂底座底面）。</summary>
+        Public Property ShowGroundGrid As Boolean = True
+
+        ''' <summary>地面网格的半边长（米），以世界原点为中心，默认覆盖整个工作区。</summary>
+        Public Property GridHalfSize As Double = 0.65
+
+        ''' <summary>地面网格的格距（米）。</summary>
+        Public Property GridStep As Double = 0.05
+
+        ''' <summary>每隔几格画一条主线。</summary>
+        Public Property GridMajorEvery As Integer = 5
+
         ''' <summary>轨迹最多保留的采样点。</summary>
         Public Property TrailLength As Integer = 600
 
@@ -72,6 +84,10 @@ Namespace Rendering
 
             Call _buffer.Clear()
 
+            If ShowGroundGrid Then
+                Call AddGroundGrid(anchor)
+            End If
+
             If ShowAxes Then
                 Call AddAxis(New Vector3(1, 0, 0), AxisXColor, anchor)
                 Call AddAxis(New Vector3(0, 1, 0), AxisYColor, anchor)
@@ -96,6 +112,40 @@ Namespace Rendering
 
             renderer.EnsureLineCapacity(count)
             renderer.UploadLines(_pending, count)
+        End Sub
+
+        ''' <summary>
+        ''' 世界 Z = <see cref="UiTheme.GroundZ"/> 平面上的地面网格（以世界原点为中心）。
+        ''' </summary>
+        ''' <remarks>
+        ''' <para>
+        ''' 没有用 <c>DxScene3DCanvas.ShowGround</c>：它的高度取自 <c>Scene.GroundZ</c>，
+        ''' 而 <see cref="Scene"/> 会先把顶点平移成"质心为原点"、<see cref="RenderHost"/> 之后又把质心加回来，
+        ''' 于是 GroundZ 与真正的最低点差了一个质心，网格会浮在底座上方几十毫米处。
+        ''' </para>
+        ''' <para>
+        ''' 这里自己把世界坐标减掉锚点，保证网格正好躺在机械臂底座底面（世界 z=0）。
+        ''' </para>
+        ''' </remarks>
+        Private Sub AddGroundGrid(anchor As Vector3)
+            Dim half As Double = System.Math.Max(0.05, GridHalfSize)
+            Dim stepSize As Double = System.Math.Max(0.01, GridStep)
+            Dim divisions As Integer = CInt(System.Math.Round(2.0 * half / stepSize))
+            Dim z As Double = UiTheme.GroundZ - anchor.z
+            Dim majorEvery As Integer = System.Math.Max(1, GridMajorEvery)
+
+            For i As Integer = 0 To divisions
+                Dim t As Double = -half + i * stepSize
+                Dim color As Color = If((i Mod majorEvery) = 0, UiTheme.GroundGridMajor, UiTheme.GroundGridMinor)
+
+                ' 平行 X 轴的一排（y = t）
+                Call AddLine(New Vector3(CSng(-half - anchor.x), CSng(t - anchor.y), CSng(z)),
+                             New Vector3(CSng(half - anchor.x), CSng(t - anchor.y), CSng(z)), color)
+
+                ' 平行 Y 轴的一排（x = t）
+                Call AddLine(New Vector3(CSng(t - anchor.x), CSng(-half - anchor.y), CSng(z)),
+                             New Vector3(CSng(t - anchor.x), CSng(half - anchor.y), CSng(z)), color)
+            Next
         End Sub
 
         Private Sub AddAxis(direction As Vector3, color As Color, anchor As Vector3)
@@ -153,8 +203,13 @@ Namespace Rendering
         End Sub
 
         ''' <summary>把颜色打包成线顶点的第 4 个 Single（内存顺序 R,G,B,A）。</summary>
+        ''' <remarks>
+        ''' <c>Color.R/G/B</c> 都是 <c>Byte</c>，而 VB 的移位运算符**保持左侧操作数类型**：
+        ''' <c>color.G &lt;&lt; 8</c> 会直接溢出成 0，结果所有线条只剩红色通道。
+        ''' 必须先 CInt 再移位。
+        ''' </remarks>
         Public Shared Function PackColor(color As Color) As Single
-            Dim rgba As Integer = color.R Or (color.G << 8) Or (color.B << 16) Or (CInt(color.A) << 24)
+            Dim rgba As Integer = CInt(color.R) Or (CInt(color.G) << 8) Or (CInt(color.B) << 16) Or (CInt(color.A) << 24)
 
             Return BitConverter.Int32BitsToSingle(rgba)
         End Function

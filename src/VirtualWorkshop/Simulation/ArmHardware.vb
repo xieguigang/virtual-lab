@@ -1,6 +1,7 @@
 Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
+Imports VirtualWorkshop.Protocol
 
 Namespace Simulation
 
@@ -26,6 +27,12 @@ Namespace Simulation
         Public Property Finished As Boolean
         Public Property Failed As Boolean
         Public Property Message As String
+
+        ''' <summary>
+        ''' 失败原因对应的协议错误码（空串表示用默认的 <c>joint_limit</c>）。
+        ''' </summary>
+        ''' <remarks>让"撞地"能返回 <c>ground_violation</c>，而不是笼统的 joint_limit。</remarks>
+        Public Property FailureCode As String
 
         ''' <summary>规划出来的关节空间路点（每段一个关节角向量）。</summary>
         Public Property Waypoints As List(Of Double())
@@ -75,8 +82,26 @@ Namespace Simulation
         ''' <summary>最近一次失败/错误信息。</summary>
         Public Property LastError As String
 
+        ''' <summary>
+        ''' 逆解的备选种子。
+        ''' </summary>
+        ''' <remarks>
+        ''' 数值 IK 是局部收敛的：从当前姿态出发时，六轴臂常常收敛到"肘部朝下"的解，
+        ''' 那个解会让大臂插进地面。撞地时换几个种子重试，优先取肘部朝上的解。
+        ''' </remarks>
+        Private Shared ReadOnly AlternativeSeeds As Double()() = {
+            New Double() {0.0, -0.55, 1.15, 0.0, 0.55, 0.0},
+            New Double() {0.0, -0.25, 0.85, 0.0, 0.45, 0.0},
+            New Double() {0.0, 0.55, -1.15, 0.0, -0.55, 0.0},
+            New Double() {0.0, -0.90, 1.60, 0.0, 0.70, 0.0},
+            New Double() {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
+        }
+
         Private _active As MotionCommand
         Private _motionCounter As Integer
+
+        ''' <summary>最近一个"不会插进地面"的关节角，用于撞地时回退。</summary>
+        Private _lastSafeQ As Double() = Nothing
         Private ReadOnly _history As New Dictionary(Of Integer, MotionCommand)()
 
         Public Sub New(simulation As ArmSimulation)
@@ -97,7 +122,39 @@ Namespace Simulation
             Me.State = Simulation.CaptureState()
         End Sub
 
+        ''' <summary>
+        ''' 撞地保护：回退到上一个安全关节角并中止当前运动。
+        ''' </summary>
+        ''' <remarks>
+        ''' 机械臂是位置控制的（kinematic），所以"别穿地"只能靠不下发会穿地的目标——
+        ''' 这里既不让它继续下探，也把目标退回到最后的安全位姿。
+        ''' </remarks>
+        Private Sub AbortOnGround(part As String)
+            If _lastSafeQ IsNot Nothing Then
+                Call Simulation.SetJointTargets(_lastSafeQ)
+            Else
+                Call Simulation.HoldCurrent()
+            End If
+
+            Dim command As MotionCommand = _active
+
+            _active = Nothing
+            LastError = $"地面阻挡（{part}）"
+
+            If command IsNot Nothing Then
+                command.Finished = True
+                command.Failed = True
+                command.Message = $"目标会让 {part} 穿过地面，已在安全位置停住"
+            End If
+        End Sub
+
         Private Sub ApplyMotion()
+            ' 上一步已经插进地面 ⇒ 立刻回退并停住，不再继续下探
+            If _active IsNot Nothing AndAlso Simulation.GroundContacts.Count > 0 Then
+                Call AbortOnGround(Simulation.GroundContacts(0))
+                Return
+            End If
+
             If _active Is Nothing Then Return
 
             Dim now As Double = Simulation.Time
@@ -123,6 +180,16 @@ Namespace Simulation
             Dim q As Double() = InterpolateAt(_active, eased)
 
             If q IsNot Nothing Then
+                ' 前瞻：这一步会让某个连杆插到地面以下就不下发，直接停在安全位姿
+                Dim violation As String = Simulation.GroundViolation(q)
+
+                If violation IsNot Nothing Then
+                    Call AbortOnGround(violation)
+                    Return
+                End If
+
+                _lastSafeQ = CType(q.Clone(), Double())
+
                 Call Simulation.SetJointTargets(q)
             End If
 
@@ -208,7 +275,20 @@ Namespace Simulation
                 target(i) = System.Math.Max(limit.Lower, System.Math.Min(limit.Upper, q(i)))
             Next
 
+            Dim violation As String = Simulation.GroundViolation(target)
+
+            If violation IsNot Nothing Then
+                Return FailedMotion(MotionKind.Joint,
+                    $"目标位姿会让 {violation} 低于地面（{Simulation.GroundZ + Simulation.GroundClearance:F3} m），已拒绝",
+                    ProtocolText.ErrGroundViolation)
+            End If
+
             Dim current As Double() = Simulation.JointPositions()
+
+            If Simulation.GroundViolation(current) Is Nothing Then
+                _lastSafeQ = CType(current.Clone(), Double())
+            End If
+
             Dim duration As Double = EstimateDuration(current, target, speed)
 
             Dim waypoints As New List(Of Double()) From {CType(current.Clone(), Double()), target}
@@ -229,6 +309,41 @@ Namespace Simulation
             Dim goal As New Pose3D(New Vector3(x, y, z), start.Rotation)
 
             Return MoveTo(goal, speed)
+        End Function
+
+        ''' <summary>
+        ''' 用备选种子重新求解逆解，返回第一个不会插进地面的解；都失败则返回 Nothing。
+        ''' </summary>
+        Private Function SolveAboveGround(goal As Pose3D) As IkResult
+            Dim count As Integer = Simulation.JointDefs.Count
+
+            For Each seed As Double() In AlternativeSeeds
+                Dim candidate As Double() = seed
+
+                If candidate.Length <> count Then
+                    candidate = New Double(count - 1) {}
+
+                    For i As Integer = 0 To System.Math.Min(seed.Length, count) - 1
+                        candidate(i) = seed(i)
+                    Next
+                End If
+
+                Dim attempt As IkResult = Kinematics.Solve(
+                    Simulation.Assembly, goal, candidate,
+                    positionOnly:=False, maxIterations:=80, tolerance:=0.001)
+
+                If Not attempt.Success Then
+                    attempt = Kinematics.Solve(
+                        Simulation.Assembly, goal, candidate,
+                        positionOnly:=True, maxIterations:=80, tolerance:=0.003)
+                End If
+
+                If attempt.Success AndAlso Simulation.GroundViolation(attempt.Q) Is Nothing Then
+                    Return attempt
+                End If
+            Next
+
+            Return Nothing
         End Function
 
         ''' <summary>笛卡尔点位运动：直线插补到目标位姿。</summary>
@@ -272,11 +387,31 @@ Namespace Simulation
                     Return FailedMotion(MotionKind.Pose, $"逆解失败: {ik.Message}（误差 {ik.TotalError:F3}）")
                 End If
 
+                ' 笛卡尔插补会经过这些中间点，逐个检查，确保整条路径都在地面之上
+                Dim violation As String = Simulation.GroundViolation(ik.Q)
+
+                If violation IsNot Nothing Then
+                    ' 先换种子重试：很可能只是收敛到了"肘部朝下"的解
+                    Dim alternative As IkResult = SolveAboveGround(goal)
+
+                    If alternative Is Nothing Then
+                        Return FailedMotion(MotionKind.Pose,
+                            $"路径会让 {violation} 穿过地面（{Simulation.GroundZ + Simulation.GroundClearance:F3} m），已拒绝",
+                            ProtocolText.ErrGroundViolation)
+                    End If
+
+                    ik = alternative
+                End If
+
                 seed = ik.Q
                 waypoints.Add(ik.Q)
             Next
 
             Dim targetQ As Double() = waypoints(waypoints.Count - 1)
+
+            If Simulation.GroundViolation(startQ) Is Nothing Then
+                _lastSafeQ = CType(startQ.Clone(), Double())
+            End If
             Dim duration As Double = EstimateDuration(startQ, targetQ, speed)
 
             Return StartMotion(New MotionCommand With {
@@ -320,7 +455,10 @@ Namespace Simulation
             Return command
         End Function
 
-        Private Function FailedMotion(kind As MotionKind, message As String) As MotionCommand
+        ''' <summary>构造一条"被拒绝"的运动。</summary>
+        ''' <param name="code">协议错误码；默认空串（协议层会退回 joint_limit）</param>
+        Private Function FailedMotion(kind As MotionKind, message As String,
+                                      Optional code As String = Nothing) As MotionCommand
             _motionCounter += 1
             LastError = message
 
@@ -330,6 +468,7 @@ Namespace Simulation
                 .Failed = True,
                 .Finished = True,
                 .Message = message,
+                .FailureCode = If(code, ""),
                 .Duration = 0.0
             }
 

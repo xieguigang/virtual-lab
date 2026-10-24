@@ -187,7 +187,10 @@ Namespace Protocol
             End If
 
             If command.Failed Then
-                Throw New ProtocolException(ProtocolText.ErrJointLimit, command.Message)
+                Dim code As String = If(String.IsNullOrEmpty(command.FailureCode),
+                                        ProtocolText.ErrJointLimit, command.FailureCode)
+
+                Throw New ProtocolException(code, command.Message)
             End If
 
             Return New JsonObject From {
@@ -294,6 +297,14 @@ Namespace Protocol
 
             If q Is Nothing OrElse q.Length = 0 Then
                 Throw New ProtocolException(ProtocolText.ErrBadParams, "缺少关节角数组 q")
+            End If
+
+            ' 实时伺服直接下发关节角，同样要先过一遍地面检查
+            Dim violation As String = Simulation.GroundViolation(q)
+
+            If violation IsNot Nothing Then
+                Throw New ProtocolException(ProtocolText.ErrGroundViolation,
+                    $"目标位姿会让 {violation} 低于地面（{Simulation.GroundZ + Simulation.GroundClearance:F3} m），已拒绝")
             End If
 
             Call Simulation.SetJointTargets(q)

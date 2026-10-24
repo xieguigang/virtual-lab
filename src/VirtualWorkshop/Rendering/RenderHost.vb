@@ -50,12 +50,14 @@ Namespace Rendering
 
             With canvas
                 .AutoClear = False
-                .BackgroundColor = Color.FromArgb(11, 15, 20)
+                .BackgroundColor = UiTheme.ViewportBackground
                 .RenderMode = SceneRenderMode.Surface
+
+                ' 不要屏幕空间的背景网格，也不要 ShowGround：
+                ' Scene.GroundZ 是"顶点质心平移后的最低点"，与真正的底座底面差一个质心。
+                ' 地面网格改由 OverlayRenderer 用动态线通道自己画（世界 z=0，正好是底座底面）。
                 .ShowGround = False
-                .ShowBackgroundGrid = True
-                .BackgroundGridColor = Color.FromArgb(30, 41, 59)
-                .BackgroundGridCellSize = 48
+                .ShowBackgroundGrid = False
                 .CullBackFaces = False
                 .ShowDebugOverlay = False
                 .EnableKeyboardShortcuts = True

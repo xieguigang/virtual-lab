@@ -91,7 +91,10 @@ if (target === null) {
 
     console.log('6) 夹紧');
     var grip = arm.grip(60);
-    arm.sleep(1200);
+
+    // 手指以 25 mm/s 闭合，从全开 96 mm 夹到 32 mm 需要 1.3 s 左右，
+    // 必须等它真正压上积木再读状态
+    arm.sleep(2500);
 
     var afterGrip = arm.state();
 

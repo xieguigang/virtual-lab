@@ -222,7 +222,43 @@ Namespace Diagnostics
             Call Section("夹爪相机")
             Call CheckCamera(host, simulation)
 
-            ' ---- 8. 稳定性 ----
+            ' ---- 8. 地面 ----
+            Call Section("地面碰撞")
+            Console.WriteLine($"  零位最低点 z = {simulation.LowestArmZ():F4}   地面 z = {simulation.GroundZ:F3}")
+
+            Dim denied As Boolean = False
+
+            Try
+                Call host.ExecuteNow(ProtocolText.CmdMoveL, New JsonObject From {
+                    {"x", 0.30}, {"y", 0.0}, {"z", -0.05}, {"speed", 0.5}})
+            Catch ex As ProtocolException
+                denied = String.Equals(ex.Code, ProtocolText.ErrGroundViolation)
+            Catch ex As Exception
+                denied = False
+            End Try
+
+            Call Check(denied, "穿地目标被拒绝（ground_violation）")
+
+            Dim accepted As Boolean = False
+
+            Try
+                Dim moved As JsonObject = host.ExecuteNow(ProtocolText.CmdMoveL, New JsonObject From {
+                    {"x", 0.34}, {"y", 0.0}, {"z", 0.20}, {"speed", 0.5}})
+
+                accepted = moved IsNot Nothing
+            Catch ex As Exception
+                accepted = False
+            End Try
+
+            Call Check(accepted, "工作高度的运动不被误拒")
+
+            Call host.StepFixed(600)
+
+            Dim lowest As Double = simulation.LowestArmZ()
+
+            Call Check(lowest > simulation.GroundZ - 0.01, $"运动全程最低点仍在地面之上（z = {lowest:F4}）")
+
+            ' ---- 9. 稳定性 ----
             Call Section("稳定性")
 
             Call host.ExecuteNow(ProtocolText.CmdEstop, New JsonObject())
