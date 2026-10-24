@@ -45,6 +45,19 @@ Namespace Simulation
         ''' </remarks>
         Public Property MotorInertia As Double = 0.002
 
+        ''' <summary>
+        ''' 机械臂的驱动方式：True = 运动学（连杆是 kinematic 刚体，轨迹精确、可重复），
+        ''' False = 动力学（连杆是动态刚体，由 JointServo3D + RevoluteJoint3D 驱动）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 默认使用运动学：<see cref="PhysicsWorld3D"/> 的铰链约束是"锚点 + 轴对齐"的逐轴冲量实现，
+        ''' 当锚点偏离质心时（六轴臂的每个关节都如此），约束冲量会产生绕轴的角冲量，
+        ''' 表现为明显的数值阻尼——实测 j5 在 6.9 N·m 下完全转不动、稳定在两轴偏差 0.14 rad。
+        ''' 运动学模式下连杆仍作为**静态碰撞体**参与物理，积木会被真实地推、夹、压，
+        ''' 而六轴轨迹严格等于指令（对神经网络训练反而更理想）。
+        ''' </remarks>
+        Public Property KinematicArm As Boolean = True
+
         ''' <summary>夹爪最大夹持力（N）。</summary>
         Public Property GripperMaxForce As Double = 60.0
         ''' <summary>夹爪手指质量（kg）。</summary>
@@ -130,6 +143,21 @@ Namespace Simulation
         ''' <summary>最近一次 Step 时检测到的接触对（已去重）。</summary>
         Public ReadOnly Property LastCollisions As New List(Of String)()
 
+        Private _jointQ As Double()
+        Private _jointQd As Double()
+        Private _previousQ As Double()
+        Private _fingerExtension As Double
+        Private _gripForce As Double
+        Private ReadOnly _fingerCenters As New List(Of Vector3)()
+        Private ReadOnly _fingerAxes As New List(Of Vector3)()
+
+        ''' <summary>当前关节角（运动学模式下的真实值）。</summary>
+        Public ReadOnly Property JointAngleQ As Double()
+            Get
+                Return _jointQ
+            End Get
+        End Property
+
         Public Sub New(assembly As ArmAssembly, Optional options As ArmSimulationOptions = Nothing)
             If assembly Is Nothing Then Throw New ArgumentNullException(NameOf(assembly))
 
@@ -166,6 +194,8 @@ Namespace Simulation
             Call FingerServos.Clear()
             Call FingerMeshes.Clear()
             Call FingerNames.Clear()
+            Call _fingerCenters.Clear()
+            Call _fingerAxes.Clear()
             Call Objects.Clear()
             Call LastCollisions.Clear()
 
@@ -210,10 +240,19 @@ Namespace Simulation
             Call BuildGripper(poses)
 
             ' ---- 关节 + 伺服 ----
+            Call InitKinematicState()
+
             For i As Integer = 0 To Assembly.Joints.Count - 1
                 Dim definition As ArmJointDef = Assembly.Joints(i)
                 Dim parentBody As RigidBody3D = Nothing
                 Dim childBody As RigidBody3D = Nothing
+
+                JointDefs.Add(definition)
+
+                ' 运动学模式：连杆是 kinematic 碰撞体，只按 FK 摆放，不需要关节约束与伺服
+                If Options.KinematicArm Then
+                    Continue For
+                End If
 
                 If Not LinkBodies.TryGetValue(definition.ParentLink, parentBody) Then Continue For
                 If Not LinkBodies.TryGetValue(definition.ChildLink, childBody) Then Continue For
@@ -230,7 +269,6 @@ Namespace Simulation
 
                 _world.Add(joint)
                 RevoluteJoints.Add(joint)
-                JointDefs.Add(definition)
 
                 Dim maxVelocity As Double = System.Math.Max(0.2, definition.Velocity * Options.VelocityScale)
                 Dim maxForce As Double = System.Math.Max(1.0, definition.Effort)
@@ -328,7 +366,8 @@ Namespace Simulation
                 Call body.InvalidateInertiaCache()
             End If
 
-            If String.Equals(link.Name, Assembly.BaseLink, StringComparison.OrdinalIgnoreCase) Then
+            If Options.KinematicArm OrElse
+               String.Equals(link.Name, Assembly.BaseLink, StringComparison.OrdinalIgnoreCase) Then
                 Call body.SetStatic()
             End If
 
@@ -378,32 +417,44 @@ Namespace Simulation
                 body.MaxSpeed = 1.0
                 body.MaxAngularSpeed = 8.0
 
+                If Options.KinematicArm Then
+                    Call body.SetStatic()
+                End If
+
                 _world.Add(body)
                 FingerBodies.Add(body)
                 FingerNames.Add(fingerName)
                 centers.Add(center)
+                _fingerCenters.Add(center)
 
                 ' 闭合方向：glb 里 Finger_L 在 link6 的 -Y 侧、Finger_R 在 +Y 侧，
                 ' 因此开合轴就是 link6 的局部 Y 轴
                 Dim inward As Vector3 = If(fingerName.EndsWith("L", StringComparison.Ordinal),
                                            New Vector3(0, 1, 0),
                                            New Vector3(0, -1, 0))
-                Dim anchorA As Vector3 = center - Assembly.InertialOriginOf(wristLink)
-                Dim joint As New PrismaticJoint3D(wristBody, body, anchorA, Vector3.Zero,
-                                                  inward, -0.03, 0.022, fingerName & "_slide")
 
-                _world.Add(joint)
-                FingerJoints.Add(joint)
+                _fingerAxes.Add(inward)
 
-                Dim servo As New JointServo3D(joint, ServoMode3D.Force) With {
-                    .Target = 0.0,
-                    .MaxForce = Options.GripperMaxForce,
-                    .ForceDamping = 30.0,
-                    .Label = fingerName
-                }
+                If Not Options.KinematicArm Then
+                    Dim anchorA As Vector3 = center - Assembly.InertialOriginOf(wristLink)
+                    Dim joint As New PrismaticJoint3D(wristBody, body, anchorA, Vector3.Zero,
+                                                      inward, -GripperOpenExtension, GripperMaxExtension,
+                                                      fingerName & "_slide")
 
-                _world.Add(servo)
-                FingerServos.Add(servo)
+                    _world.Add(joint)
+                    FingerJoints.Add(joint)
+
+                    Dim servo As New JointServo3D(joint, ServoMode3D.Force) With {
+                        .Target = 0.0,
+                        .MaxForce = Options.GripperMaxForce,
+                        .ForceDamping = 30.0,
+                        .Label = fingerName
+                    }
+
+                    _world.Add(servo)
+                    FingerServos.Add(servo)
+                End If
+
                 FingerMeshes.Add(MeshTessellator.Offset(mesh, center))
             Next
 
@@ -431,6 +482,10 @@ Namespace Simulation
 
             Time += _world.FixedDt
             StepCount += 1
+
+            If Options.KinematicArm Then
+                Call UpdateKinematicSpeeds()
+            End If
 
             Call RefreshCollisions()
         End Sub
@@ -480,6 +535,19 @@ Namespace Simulation
         Public Sub SetJointTargets(q As Double())
             If q Is Nothing Then Return
 
+            If Options.KinematicArm Then
+                If _jointQ Is Nothing OrElse _jointQ.Length <> q.Length Then
+                    _jointQ = New Double(q.Length - 1) {}
+                    _previousQ = New Double(q.Length - 1) {}
+                    _jointQd = New Double(q.Length - 1) {}
+                End If
+
+                Array.Copy(_jointQ, _previousQ, _jointQ.Length)
+                Array.Copy(q, _jointQ, System.Math.Min(q.Length, _jointQ.Length))
+                Call ApplyKinematicPose()
+                Return
+            End If
+
             For i As Integer = 0 To System.Math.Min(JointServos.Count, q.Length) - 1
                 JointServos(i).Target = q(i)
                 JointServos(i).Mode = ServoMode3D.Position
@@ -488,14 +556,22 @@ Namespace Simulation
 
         ''' <summary>设置单个关节的目标角。</summary>
         Public Sub SetJointTarget(index As Integer, value As Double)
-            If index < 0 OrElse index >= JointServos.Count Then Return
+            Dim q As Double() = JointPositions()
 
-            JointServos(index).Target = value
-            JointServos(index).Mode = ServoMode3D.Position
+            If index < 0 OrElse index >= q.Length Then Return
+
+            q(index) = value
+            Call SetJointTargets(q)
         End Sub
 
         ''' <summary>当前关节角。</summary>
         Public Function JointPositions() As Double()
+            If Options.KinematicArm Then
+                If _jointQ Is Nothing Then Return New Double() {}
+
+                Return CType(_jointQ.Clone(), Double())
+            End If
+
             Dim out(RevoluteJoints.Count - 1) As Double
 
             For i As Integer = 0 To RevoluteJoints.Count - 1
@@ -507,6 +583,12 @@ Namespace Simulation
 
         ''' <summary>当前关节角速度。</summary>
         Public Function JointSpeeds() As Double()
+            If Options.KinematicArm Then
+                If _jointQd Is Nothing Then Return New Double() {}
+
+                Return CType(_jointQd.Clone(), Double())
+            End If
+
             Dim out(RevoluteJoints.Count - 1) As Double
 
             For i As Integer = 0 To RevoluteJoints.Count - 1
@@ -516,8 +598,84 @@ Namespace Simulation
             Return out
         End Function
 
+        ' ---- 运动学模式 ----
+
+        ''' <summary>夹爪手指的最大闭合行程（米）。</summary>
+        Public Const GripperMaxExtension As Double = 0.022
+        ''' <summary>夹爪手指的最大张开行程（米）。</summary>
+        Public Const GripperOpenExtension As Double = 0.03
+
+        Private Sub InitKinematicState()
+            Dim count As Integer = System.Math.Max(1, Assembly.Joints.Count)
+
+            _jointQ = New Double(count - 1) {}
+            _previousQ = New Double(count - 1) {}
+            _jointQd = New Double(count - 1) {}
+            _fingerExtension = 0.0
+            _gripForce = 0.0
+
+            Call ApplyKinematicPose()
+        End Sub
+
+        ''' <summary>按当前关节角把连杆与手指摆到 FK 位置（运动学模式）。</summary>
+        Private Sub ApplyKinematicPose()
+            If Not Options.KinematicArm Then Return
+            If _jointQ Is Nothing Then Return
+
+            Dim poses As Dictionary(Of String, Pose3D) = Assembly.ForwardKinematics(_jointQ)
+
+            For Each pair As KeyValuePair(Of String, RigidBody3D) In LinkBodies
+                Dim pose As Pose3D = Assembly.BodyPose(poses, pair.Key)
+                Dim body As RigidBody3D = pair.Value
+
+                body.Position = pose.Position
+                body.Orientation = pose.Rotation
+                body.Velocity = Vector3.Zero
+                body.AngularVelocity = Vector3.Zero
+            Next
+
+            Call ApplyFingerPose(poses)
+        End Sub
+
+        Private Sub ApplyFingerPose(poses As Dictionary(Of String, Pose3D))
+            If FingerBodies.Count = 0 OrElse Assembly.JointCount = 0 Then Return
+            If _fingerCenters.Count < FingerBodies.Count Then Return
+
+            Dim wristLink As String = Assembly.Joints(Assembly.Joints.Count - 1).ChildLink
+            Dim wristPose As Pose3D = Assembly.BodyPose(poses, wristLink)
+
+            For i As Integer = 0 To FingerBodies.Count - 1
+                Dim local As Vector3 = _fingerCenters(i) - _fingerAxes(i) * _fingerExtension
+                Dim pose As New Pose3D(wristPose.Transform(local), wristPose.Rotation)
+                Dim body As RigidBody3D = FingerBodies(i)
+
+                body.Position = pose.Position
+                body.Orientation = pose.Rotation
+                body.Velocity = Vector3.Zero
+                body.AngularVelocity = Vector3.Zero
+            Next
+        End Sub
+
+        Private Sub UpdateKinematicSpeeds()
+            If _jointQ Is Nothing OrElse _jointQd Is Nothing Then Return
+
+            Dim dt As Double = _world.FixedDt
+
+            If dt <= 0.0 Then Return
+
+            For i As Integer = 0 To _jointQ.Length - 1
+                _jointQd(i) = (_jointQ(i) - _previousQ(i)) / dt
+                _previousQ(i) = _jointQ(i)
+            Next
+        End Sub
+
         ''' <summary>保持当前位置（把目标设为当前角）。</summary>
         Public Sub HoldCurrent()
+            If Options.KinematicArm Then
+                Call SetJointTargets(JointPositions())
+                Return
+            End If
+
             For Each servo As JointServo3D In JointServos
                 servo.Target = servo.CurrentPosition
                 servo.Mode = ServoMode3D.Position
@@ -543,7 +701,7 @@ Namespace Simulation
             Next
         End Sub
 
-        ''' <summary>急停：所有伺服失能、速度清零。</summary>
+        ''' <summary>急停：伺服失能、速度清零。</summary>
         Public Sub EmergencyStop()
             Estop = True
 
@@ -562,8 +720,28 @@ Namespace Simulation
         '  夹爪
         ' /********************************************************************************/
 
-        ''' <summary>夹紧：<paramref name="force"/> 是每个手指的最大夹持力（N）。</summary>
+        ''' <summary>
+        ''' 夹紧：<paramref name="force"/> 是期望夹持力（N）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 运动学模式下夹持力被映射成手指的闭合行程：力越大，手指压得越深，
+        ''' 接触求解器给出的法向力与库仑摩擦上限就越大。夹持力不足时积木会因为
+        ''' 重力超过摩擦力而真实地滑落，不需要额外的"抓取绑定"。
+        ''' </remarks>
         Public Sub Grip(force As Double)
+            _gripForce = System.Math.Max(0.0, force)
+
+            If Options.KinematicArm Then
+                Dim ratio As Double = 0.0
+
+                If Options.GripperMaxForce > 0.0 Then ratio = _gripForce / Options.GripperMaxForce
+                ratio = System.Math.Max(0.0, System.Math.Min(1.0, ratio))
+
+                _fingerExtension = GripperMaxExtension * ratio
+                Call ApplyKinematicPose()
+                Return
+            End If
+
             For Each servo As JointServo3D In FingerServos
                 servo.MaxForce = System.Math.Max(1.0, force)
                 servo.Target = System.Math.Max(1.0, force)
@@ -571,8 +749,16 @@ Namespace Simulation
             Next
         End Sub
 
-        ''' <summary>松开（反向小力推开手指）。</summary>
+        ''' <summary>松开（张开手指）。</summary>
         Public Sub ReleaseGripper(Optional force As Double = 8.0)
+            _gripForce = 0.0
+
+            If Options.KinematicArm Then
+                _fingerExtension = -GripperOpenExtension
+                Call ApplyKinematicPose()
+                Return
+            End If
+
             For Each servo As JointServo3D In FingerServos
                 servo.MaxForce = System.Math.Max(1.0, force)
                 servo.Target = -System.Math.Max(1.0, force) * 0.6
@@ -582,6 +768,10 @@ Namespace Simulation
 
         ''' <summary>停止手指（保持当前力为 0，手指自由）。</summary>
         Public Sub IdleGripper()
+            _gripForce = 0.0
+
+            If Options.KinematicArm Then Return
+
             For Each servo As JointServo3D In FingerServos
                 servo.Target = 0.0
                 servo.Mode = ServoMode3D.Force
@@ -591,15 +781,21 @@ Namespace Simulation
         ''' <summary>当前开口宽度（米）。</summary>
         Public ReadOnly Property GripperOpening As Double
             Get
+                If Options.KinematicArm Then
+                    Return FingerBaseGap - 2.0 * _fingerExtension
+                End If
+
                 If FingerJoints.Count < 2 Then Return FingerBaseGap
 
                 Return FingerBaseGap - (FingerJoints(0).Position + FingerJoints(1).Position)
             End Get
         End Property
 
-        ''' <summary>当前夹持力（N）。</summary>
+        ''' <summary>当前指令夹持力（N）。</summary>
         Public ReadOnly Property GripperForce As Double
             Get
+                If Options.KinematicArm Then Return _gripForce
+
                 Dim max As Double = 0.0
 
                 For Each servo As JointServo3D In FingerServos
@@ -801,7 +997,9 @@ Namespace Simulation
                 .Gripper = New GripperState With {
                     .Opening = GripperOpening,
                     .Force = GripperForce,
-                    .Closing = FingerServos.Count > 0 AndAlso FingerServos(0).Target > 0.0,
+                    .Closing = If(Options.KinematicArm,
+                                  _fingerExtension > 0.0,
+                                  FingerServos.Count > 0 AndAlso FingerServos(0).Target > 0.0),
                     .Contact = holdingId IsNot Nothing,
                     .HoldingId = holdingId
                 },

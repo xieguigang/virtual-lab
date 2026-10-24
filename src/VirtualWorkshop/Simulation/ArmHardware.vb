@@ -189,7 +189,7 @@ Namespace Simulation
                 Return FailedMotion(MotionKind.Joint, "急停中，需要先 reset")
             End If
 
-            Dim count As Integer = Simulation.JointServos.Count
+            Dim count As Integer = Simulation.JointDefs.Count
 
             If q Is Nothing OrElse q.Length <> count Then
                 Return FailedMotion(MotionKind.Joint, $"目标关节角数量应为 {count}")
@@ -279,7 +279,7 @@ Namespace Simulation
 
         ''' <summary>回零（所有关节角 = 0）。</summary>
         Public Function Home(Optional speed As Double = 0.3) As MotionCommand
-            Return MoveJ(New Double(Simulation.JointServos.Count - 1) {}, speed)
+            Return MoveJ(New Double(Simulation.JointDefs.Count - 1) {}, speed)
         End Function
 
         ''' <summary>停止当前运动并保持当前位置。</summary>
