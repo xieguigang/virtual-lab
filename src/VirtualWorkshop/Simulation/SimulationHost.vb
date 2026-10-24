@@ -4,6 +4,7 @@ Imports System.Text.Json.Nodes
 Imports System.Threading
 Imports System.Threading.Tasks
 Imports VirtualWorkshop.Protocol
+Imports VirtualWorkshop.Sensing
 
 Namespace Simulation
 
@@ -37,6 +38,15 @@ Namespace Simulation
         Public ReadOnly Property Dispatcher As CommandDispatcher
         Public ReadOnly Property Clock As New SimulationClock()
 
+        Private ReadOnly _camera As GripperCamera
+
+        ''' <summary>夹爪第一视角相机（可能为空：用 --camera off 关闭时）。</summary>
+        Public ReadOnly Property Camera As GripperCamera
+            Get
+                Return _camera
+            End Get
+        End Property
+
         ''' <summary>最新的状态快照（仿真线程发布）。</summary>
         Public Property State As StateSnapshot
 
@@ -53,13 +63,22 @@ Namespace Simulation
         Private _rateAccumulator As Double
         Private _rateSteps As Integer
 
-        Public Sub New(simulation As ArmSimulation, hardware As ArmHardware)
+        Public Sub New(simulation As ArmSimulation, hardware As ArmHardware,
+                       Optional camera As GripperCamera = Nothing)
+
             If simulation Is Nothing Then Throw New ArgumentNullException(NameOf(simulation))
 
             Me.Simulation = simulation
             Me.Hardware = If(hardware, New ArmHardware(simulation))
             Me.Dispatcher = New CommandDispatcher(simulation, Me.Hardware)
             Me.State = Me.Hardware.State
+
+            _camera = camera
+
+            ' 让指令层也能访问相机（frame / camera 指令）
+            Me.Dispatcher.Camera = camera
+
+            Call AttachCamera()
         End Sub
 
         ''' <summary>从任意线程投递一条指令，返回结果 Task。</summary>
@@ -96,7 +115,11 @@ Namespace Simulation
             Next
 
             LastFrameSteps = steps
+
+            Call CaptureCamera()
+
             Me.State = Hardware.State
+            Call AttachCamera()
 
             Call UpdateRate(realSeconds, steps)
         End Sub
@@ -109,8 +132,66 @@ Namespace Simulation
                 Call Hardware.Tick()
             Next
 
+            Call CaptureCamera()
+
             Me.State = Hardware.State
+            Call AttachCamera()
         End Sub
+
+        ' /********************************************************************************/
+        '  夹爪相机
+        ' /********************************************************************************/
+
+        ''' <summary>按相机配置的帧率捕获一帧（不满足间隔时什么都不做）。</summary>
+        Private Sub CaptureCamera()
+            If _camera Is Nothing Then Return
+
+            Try
+                Call _camera.MaybeCapture(Simulation)
+            Catch ex As Exception
+                ' 相机永远不能让仿真 tick 失败
+            End Try
+        End Sub
+
+        ''' <summary>把相机摘要写进状态快照。</summary>
+        Private Sub AttachCamera()
+            If _camera Is Nothing OrElse Me.State Is Nothing Then Return
+
+            Try
+                Me.State.Camera = BuildCameraState()
+            Catch ex As Exception
+                ' 忽略摘要失败
+            End Try
+        End Sub
+
+        Private Function BuildCameraState() As CameraState
+            Dim config As CameraConfig = _camera.Config
+
+            Dim summary As New CameraState With {
+                .Enabled = config.Enabled,
+                .Width = config.Width,
+                .Height = config.Height,
+                .FieldOfView = config.FieldOfView,
+                .FocalPixels = config.FocalPixels,
+                .Rate = config.Rate,
+                .Fps = _camera.Fps,
+                .CaptureMs = _camera.LastCaptureMs
+            }
+
+            Dim frame As CameraFrame = _camera.Latest
+
+            If frame IsNot Nothing Then
+                summary.Time = frame.Time
+                summary.StepIndex = frame.StepIndex
+
+                If frame.Pose IsNot Nothing Then
+                    summary.Position = StateSnapshot.ToArray(frame.Pose.Position)
+                    summary.Rpy = frame.Pose.RpyDegrees()
+                End If
+            End If
+
+            Return summary
+        End Function
 
         Private Sub ProcessPending()
             Dim pending As PendingCall = Nothing

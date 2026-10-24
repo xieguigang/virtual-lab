@@ -2,6 +2,7 @@ Imports System.Text.Json.Nodes
 Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
+Imports VirtualWorkshop.Sensing
 Imports VirtualWorkshop.Simulation
 
 Namespace Protocol
@@ -29,6 +30,9 @@ Namespace Protocol
 
         Public ReadOnly Property Simulation As ArmSimulation
         Public ReadOnly Property Hardware As ArmHardware
+
+        ''' <summary>夹爪第一视角相机（未启用时为 Nothing）。</summary>
+        Public Property Camera As GripperCamera
 
         ''' <summary>仿真速度倍率（0 表示暂停）。</summary>
         Public Property RealtimeFactor As Double = 1.0
@@ -77,6 +81,8 @@ Namespace Protocol
                 Case ProtocolText.CmdClear : Return Clear()
                 Case ProtocolText.CmdObjects : Return Objects()
                 Case ProtocolText.CmdConfig : Return Config(args)
+                Case ProtocolText.CmdFrame : Return Frame(args)
+                Case ProtocolText.CmdCamera : Return CameraControl(args)
                 Case Else
                     Throw New ProtocolException(ProtocolText.ErrUnknownCommand, "未知指令: " & command)
             End Select
@@ -444,9 +450,211 @@ Namespace Protocol
 
                 Case Else
                     Throw New ProtocolException(ProtocolText.ErrBadParams, "未知配置项: " & key)
-            End Select
+                    End Select
+                    End Function
+
+                    ' /********************************************************************************/
+                    '  夹爪相机
+                    ' /********************************************************************************/
+
+                    ''' <summary>
+                    ''' 取一帧夹爪相机图像。
+                    ''' </summary>
+                    ''' <remarks>
+                    ''' 参数：<c>format</c>（png / rgb / both / all）、<c>depth</c>（f32 / u16mm / true / false）、
+                    ''' <c>width</c>、<c>height</c>、<c>fov</c>（临时覆盖，仅本次请求生效）。
+                    ''' </remarks>
+                    Private Function Frame(args As JsonObject) As JsonObject
+                    If Camera Is Nothing Then
+                    Throw New ProtocolException(ProtocolText.ErrNotEnabled, "相机未启用（用 --camera on 或 camera {enabled:true} 启动）")
+                    End If
+
+                    Dim originalWidth As Integer = Camera.Config.Width
+                    Dim originalHeight As Integer = Camera.Config.Height
+                    Dim originalFov As Double = Camera.Config.FieldOfView
+                    Dim originalEnabled As Boolean = Camera.Config.Enabled
+                    Dim changed As Boolean = False
+
+                    Try
+                    Dim width As Integer = CInt(JsonText.Num(args, ProtocolText.FieldWidth, originalWidth))
+                    Dim height As Integer = CInt(JsonText.Num(args, ProtocolText.FieldHeight, originalHeight))
+
+                    If width <> originalWidth OrElse height <> originalHeight Then
+                    Camera.Config.Width = width
+                    Camera.Config.Height = height
+                    Call Camera.Config.Clamp()
+                    Call Camera.Invalidate()
+                    changed = True
+                    End If
+
+                    If args.ContainsKey("fov") Then
+                    Camera.Config.FieldOfView = JsonText.Num(args, "fov", originalFov)
+                    Call Camera.Config.Clamp()
+                    Call Camera.Invalidate()
+                    changed = True
+                    End If
+
+                Dim enabled As Boolean = JsonText.Bool(args, "enabled", True)
+                Dim wasEnabled As Boolean = Camera.Config.Enabled
+
+                If enabled <> wasEnabled Then
+                    Camera.Config.Enabled = enabled
+                    changed = True
+                End If
+
+                Dim capture As CameraFrame = Camera.CaptureNow(Simulation)
+
+                If capture Is Nothing Then
+                    Throw New ProtocolException(ProtocolText.ErrSimFault, "相机没有渲染出帧")
+                End If
+
+                Return BuildFrameResult(capture, JsonText.Str(args, ProtocolText.FieldFormat, "png"),
+                                        JsonText.Str(args, ProtocolText.FieldDepth, ""))
+            Finally
+                If changed Then
+                    Camera.Config.Width = originalWidth
+                    Camera.Config.Height = originalHeight
+                    Camera.Config.FieldOfView = originalFov
+                    Camera.Config.Enabled = originalEnabled
+                    Call Camera.Invalidate()
+                End If
+            End Try
         End Function
 
-    End Class
+                    Private Function BuildFrameResult(frame As CameraFrame, format As String, depthSpec As String) As JsonObject
+                    Dim mode As String = If(String.IsNullOrEmpty(format), "png", format.Trim().ToLowerInvariant())
+                    Dim wantPng As Boolean = mode = "png" OrElse mode = "both" OrElse mode = "all"
+                    Dim wantRgb As Boolean = mode = "rgb" OrElse mode = "both" OrElse mode = "all"
+
+                    If Not wantPng AndAlso Not wantRgb Then
+                    Throw New ProtocolException(ProtocolText.ErrBadParams, "format 只能是 png / rgb / both / all")
+                    End If
+
+                    Dim config As CameraConfig = Camera.Config
+
+                    Dim result As New JsonObject From {
+                    {ProtocolText.FieldWidth, frame.Width},
+                    {ProtocolText.FieldHeight, frame.Height},
+                    {ProtocolText.FieldFormat, If(wantPng, "png", "rgb")},
+                    {"time", frame.Time},
+                    {"step", frame.StepIndex},
+                    {"captureMs", Camera.LastCaptureMs}
+                    }
+
+                    If wantPng Then
+                    result("data") = frame.ToPngBase64()
+                    Else
+                    result("data") = frame.ToRgbBase64()
+                    End If
+
+                    If wantRgb Then
+                    result(ProtocolText.FieldRgb) = frame.ToRgbBase64()
+                    result("pixelFormat") = "rgb24"
+                    End If
+
+                    ' ---- 深度 ----
+                    Dim depthMode As String = If(String.IsNullOrEmpty(depthSpec), "", depthSpec.Trim().ToLowerInvariant())
+
+                    Select Case depthMode
+                    Case "f32", "float", "1", "true"
+                    result(ProtocolText.FieldDepth) = New JsonObject From {
+                       {"format", "f32"},
+                       {"encoding", "base64"},
+                       {"width", frame.Width},
+                       {"height", frame.Height},
+                       {"data", frame.ToDepthF32Base64()}
+                    }
+                    Case "u16mm", "u16", "mm"
+                    result(ProtocolText.FieldDepth) = New JsonObject From {
+                       {"format", "u16mm"},
+                       {"encoding", "base64"},
+                       {"width", frame.Width},
+                       {"height", frame.Height},
+                       {"data", frame.ToDepthU16MmBase64()}
+                    }
+                    End Select
+
+                    ' ---- 内外参 ----
+                    result(ProtocolText.FieldCamera) = BuildCameraExtrinsics(frame, config)
+
+                    Return result
+                    End Function
+
+                    ''' <summary>查询/修改相机参数；不带参数时返回当前配置与外参。</summary>
+                    Private Function CameraControl(args As JsonObject) As JsonObject
+                    If Camera Is Nothing Then
+                    Throw New ProtocolException(ProtocolText.ErrNotEnabled, "相机未启用（用 --camera on 启动）")
+                    End If
+
+                    If args Is Nothing OrElse args.Count = 0 Then Return CameraSummary()
+
+                    Dim config As CameraConfig = Camera.Config
+
+                    If args.ContainsKey("enabled") Then config.Enabled = JsonText.Bool(args, "enabled", True)
+                    If args.ContainsKey(ProtocolText.FieldWidth) Then config.Width = CInt(JsonText.Num(args, ProtocolText.FieldWidth, config.Width))
+                    If args.ContainsKey(ProtocolText.FieldHeight) Then config.Height = CInt(JsonText.Num(args, ProtocolText.FieldHeight, config.Height))
+                    If args.ContainsKey("fov") Then config.FieldOfView = JsonText.Num(args, "fov", config.FieldOfView)
+                    If args.ContainsKey("rate") Then config.Rate = JsonText.Num(args, "rate", config.Rate)
+                    If args.ContainsKey("ambient") Then config.Ambient = JsonText.Num(args, "ambient", config.Ambient)
+
+                    Dim offset As Double() = JsonText.Numbers(args, "offset")
+
+                    If offset IsNot Nothing AndAlso offset.Length >= 3 Then
+                    config.Offset = New Vector3(offset(0), offset(1), offset(2))
+                    End If
+
+                    Call Camera.Invalidate()
+
+                    Return CameraSummary()
+                    End Function
+
+                    Private Function CameraSummary() As JsonObject
+                    Dim frame As CameraFrame = Camera.Latest
+
+                    If frame Is Nothing OrElse frame.Width <> Camera.Config.Width Then
+                    frame = Camera.CaptureNow(Simulation)
+                    End If
+
+                    Dim config As CameraConfig = Camera.Config
+
+                    Dim summary As New JsonObject From {
+                    {"enabled", config.Enabled},
+                    {ProtocolText.FieldWidth, config.Width},
+                    {ProtocolText.FieldHeight, config.Height},
+                    {"fov", config.FieldOfView},
+                    {"hfov", config.HorizontalFieldOfView},
+                    {"rate", config.Rate},
+                    {"fps", Camera.Fps},
+                    {"captureMs", Camera.LastCaptureMs},
+                    {"triangles", Camera.TriangleCount},
+                    {"offset", JsonText.ArrayOf(New Double() {config.Offset.x, config.Offset.y, config.Offset.z})}
+                    }
+
+                    If frame IsNot Nothing Then
+                    summary(ProtocolText.FieldCamera) = BuildCameraExtrinsics(frame, config)
+                    End If
+
+                    Return summary
+                    End Function
+
+                    Private Shared Function BuildCameraExtrinsics(frame As CameraFrame, config As CameraConfig) As JsonObject
+                    Dim node As New JsonObject From {
+                    {"fov", config.FieldOfView},
+                    {"fx", config.FocalPixels},
+                    {"fy", config.FocalPixels},
+                    {"cx", frame.Width / 2.0},
+                    {"cy", frame.Height / 2.0},
+                    {"near", SoftwareRasterizer.NearPlane}
+                    }
+
+                    If frame.Pose IsNot Nothing Then
+                    node("position") = JsonText.ArrayOf(StateSnapshot.ToArray(frame.Pose.Position))
+                    node("rpy") = JsonText.ArrayOf(frame.Pose.RpyDegrees())
+                    End If
+
+                    Return node
+                    End Function
+
+                    End Class
 
 End Namespace

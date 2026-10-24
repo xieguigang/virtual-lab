@@ -1,4 +1,5 @@
 Imports System.IO
+Imports Microsoft.VisualBasic.Engine.Physics
 
 Namespace Configuration
 
@@ -35,6 +36,19 @@ Namespace Configuration
 
         ''' <summary>是否使用运动学机械臂（默认是）。</summary>
         Public Property KinematicArm As Boolean = True
+
+        ' ---- 夹爪相机 ----
+
+        ''' <summary>是否启用夹爪第一视角相机。</summary>
+        Public Property CameraEnabled As Boolean = True
+        Public Property CameraWidth As Integer = 320
+        Public Property CameraHeight As Integer = 240
+        ''' <summary>垂直视场角（度）。</summary>
+        Public Property CameraFov As Double = 60.0
+        ''' <summary>自动捕获帧率（Hz）。</summary>
+        Public Property CameraRate As Double = 15.0
+        ''' <summary>相机光心在 link6 局部系中的偏移。</summary>
+        Public Property CameraOffset As New Vector3(0.045, 0.0, 0.0)
 
         Public ReadOnly Property Args As New List(Of String)()
 
@@ -84,6 +98,31 @@ Namespace Configuration
                         options.EnableHttp = False
                     Case "--dynamic"
                         options.KinematicArm = False
+                    Case "--camera"
+                        options.CameraEnabled = Not IsOff(NextValue(args, i))
+                        i += 1
+                    Case "--camera-size"
+                        Dim size As String = NextValue(args, i)
+
+                        If Not String.IsNullOrEmpty(size) Then
+                            Dim parts As String() = size.ToLowerInvariant().Split("x"c)
+
+                            If parts.Length >= 2 Then
+                                options.CameraWidth = ParseInt(parts(0), options.CameraWidth)
+                                options.CameraHeight = ParseInt(parts(1), options.CameraHeight)
+                            End If
+                        End If
+
+                        i += 1
+                    Case "--camera-fov"
+                        options.CameraFov = ParseDouble(NextValue(args, i), options.CameraFov)
+                        i += 1
+                    Case "--camera-rate"
+                        options.CameraRate = ParseDouble(NextValue(args, i), options.CameraRate)
+                        i += 1
+                    Case "--camera-offset"
+                        options.CameraOffset = ParseVector(NextValue(args, i), options.CameraOffset)
+                        i += 1
                     Case Else
                         options.Args.Add(token)
                 End Select
@@ -92,6 +131,29 @@ Namespace Configuration
             End While
 
             Return options
+        End Function
+
+        Private Shared Function IsOff(text As String) As Boolean
+            If String.IsNullOrEmpty(text) Then Return False
+
+            Return String.Equals(text, "off", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(text, "false", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(text, "0", StringComparison.Ordinal)
+        End Function
+
+        ''' <summary>解析 "x,y,z" 或 "x y z" 形式的向量。</summary>
+        Private Shared Function ParseVector(text As String, defaultValue As Vector3) As Vector3
+            If String.IsNullOrWhiteSpace(text) Then Return defaultValue
+
+            Dim parts As String() = text.Split(New Char() {","c, " "c, ";"c}, StringSplitOptions.RemoveEmptyEntries)
+
+            If parts.Length < 3 Then Return defaultValue
+
+            Dim x As Double = ParseDouble(parts(0), defaultValue.x)
+            Dim y As Double = ParseDouble(parts(1), defaultValue.y)
+            Dim z As Double = ParseDouble(parts(2), defaultValue.z)
+
+            Return New Vector3(x, y, z)
         End Function
 
         Private Shared Function NextValue(args As String(), index As Integer) As String

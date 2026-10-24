@@ -4,6 +4,7 @@ Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
 Imports VirtualWorkshop.Protocol
+Imports VirtualWorkshop.Sensing
 Imports VirtualWorkshop.Simulation
 
 Namespace Diagnostics
@@ -202,7 +203,11 @@ Namespace Diagnostics
                                                       New JsonObject From {{"key", "realtime"}, {"value", 4.0}})
             Call Check(Math.Abs(JsonText.Num(config, "realtime", 0) - 4.0) < 1.0E-9, "config 修改实时倍率")
 
-            ' ---- 7. 稳定性 ----
+            ' ---- 7. 相机 ----
+            Call Section("夹爪相机")
+            Call CheckCamera(host, simulation)
+
+            ' ---- 8. 稳定性 ----
             Call Section("稳定性")
 
             Call host.ExecuteNow(ProtocolText.CmdEstop, New JsonObject())
@@ -221,6 +226,124 @@ Namespace Diagnostics
             Console.WriteLine("SELFTEST PASS")
             Return 0
         End Function
+
+        ''' <summary>相机断言：出帧、尺寸、非全黑、颜色层次、深度范围、PNG 魔数与状态摘要。</summary>
+        Private Sub CheckCamera(host As SimulationHost, simulation As ArmSimulation)
+            Dim camera As GripperCamera = host.Camera
+
+            Call Check(camera IsNot Nothing, "相机已创建")
+
+            If camera Is Nothing Then Return
+
+            Call Check(camera.Config.Width = 320 AndAlso camera.Config.Height = 240, "默认分辨率 320x240")
+
+            Dim frame As CameraFrame = camera.CaptureNow(simulation)
+
+            Call Check(frame IsNot Nothing, "能渲染出一帧")
+
+            If frame Is Nothing Then Return
+
+            Call Check(frame.Rgb.Length = 320 * 240 * 3, "RGB 缓冲 = 宽*高*3 字节")
+            Call Check(frame.Depth.Length = 320 * 240, "深度缓冲 = 宽*高")
+
+            Dim background As Integer = camera.Config.BackgroundColor
+            Dim bgR As Integer = (background >> 16) And &HFF
+            Dim bgG As Integer = (background >> 8) And &HFF
+            Dim bgB As Integer = background And &HFF
+
+            Dim colored As Integer = 0
+            Dim distinct As New HashSet(Of Integer)()
+            Dim sampleColor As Integer = 0
+
+            For i As Integer = 0 To frame.Rgb.Length - 3 Step 3
+                Dim r As Integer = frame.Rgb(i)
+                Dim g As Integer = frame.Rgb(i + 1)
+                Dim b As Integer = frame.Rgb(i + 2)
+
+                If r <> bgR OrElse g <> bgG OrElse b <> bgB Then
+                    colored += 1
+
+                    Dim key As Integer = (r << 16) Or (g << 8) Or b
+
+                    If sampleColor = 0 Then sampleColor = key
+
+                    distinct.Add(key)
+                End If
+            Next
+
+            Call Check(colored > 500, $"画面有内容（{colored} 个非背景像素）")
+            Call Check(distinct.Count >= 3, $"颜色有层次（{distinct.Count} 种颜色，首个 #{sampleColor:X6}）")
+
+            Dim hits As Integer = 0
+
+            For i As Integer = 0 To frame.Depth.Length - 1
+                Dim d As Single = frame.Depth(i)
+
+                If d > 0.005 AndAlso d <= camera.Config.MaxDistance Then hits += 1
+            Next
+
+            Call Check(hits > 500, $"深度有命中（{hits} 个像素）")
+
+            Dim png As Byte() = frame.ToPng()
+
+            Call Check(png.Length > 100 AndAlso png(0) = &H89 AndAlso png(1) = &H50 AndAlso
+                      png(2) = &H4E AndAlso png(3) = &H47, "PNG 魔数正确")
+
+            Dim depthBytes As Byte() = Convert.FromBase64String(frame.ToDepthF32Base64())
+
+            Call Check(depthBytes.Length = 320 * 240 * 4, "深度 base64 长度 = 宽*高*4")
+
+            Call host.StepFixed(2)
+
+            Call Check(host.State IsNot Nothing AndAlso host.State.Camera IsNot Nothing, "state 含相机摘要")
+            Call Check(host.State IsNot Nothing AndAlso host.State.Camera IsNot Nothing AndAlso
+                       host.State.Camera.FocalPixels > 100, "相机内参已发布")
+
+            ' 末端转朝下后应该能看到桌面上的积木
+            Dim motion As JsonObject = host.ExecuteNow(ProtocolText.CmdMoveTo, New JsonObject From {
+                {"pose", New JsonObject From {
+                    {"x", 0.32}, {"y", 0.0}, {"z", 0.18},
+                    {"rx", 0.0}, {"ry", 90.0}, {"rz", 0.0}
+                }},
+                {"speed", 1.0}
+            })
+
+            Dim id As Integer = CInt(JsonText.Num(motion, "motionId", 0))
+
+            For i As Integer = 1 To 600
+                Call host.StepFixed(1)
+
+                If host.Hardware.IsMotionDone(id) Then Exit For
+            Next
+
+            Dim down As CameraFrame = camera.CaptureNow(simulation)
+
+            If down IsNot Nothing Then
+                Dim far As Integer = 0
+                Dim vivid As New HashSet(Of Integer)()
+
+                For i As Integer = 0 To down.Depth.Length - 1
+                    If down.Depth(i) > 0.15 Then far += 1
+                Next
+
+                For i As Integer = 0 To down.Rgb.Length - 3 Step 3
+                    Dim r As Integer = down.Rgb(i)
+                    Dim g As Integer = down.Rgb(i + 1)
+                    Dim b As Integer = down.Rgb(i + 2)
+
+                    Dim maxValue As Integer = System.Math.Max(r, System.Math.Max(g, b))
+                    Dim minValue As Integer = System.Math.Min(r, System.Math.Min(g, b))
+
+                    ' 积木是彩色的（橙/青/绿…），机械臂是灰白，饱和度能区分开
+                    If maxValue - minValue > 40 Then vivid.Add((r << 16) Or (g << 8) Or b)
+                Next
+
+                Call Check(far > 200, $"俯视时能看到较远场景（{far} 个远距像素）")
+                Call Check(vivid.Count >= 3, $"俯视时能看到彩色积木（{vivid.Count} 种饱和色）")
+            End If
+
+            Call Check(Not camera.Faulted, "相机无异常" & If(camera.LastError Is Nothing, "", "：" & camera.LastError))
+        End Sub
 
         Private Sub Section(title As String)
             Console.WriteLine()

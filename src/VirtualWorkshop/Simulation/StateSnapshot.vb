@@ -35,6 +35,36 @@ Namespace Simulation
 
     End Class
 
+    ''' <summary>
+    ''' 夹爪相机的状态摘要（只含参数与外参，<b>不含像素</b>，避免状态流被图像撑爆）。
+    ''' </summary>
+    Public Class CameraState
+
+        Public Property Enabled As Boolean
+        Public Property Width As Integer
+        Public Property Height As Integer
+        ''' <summary>垂直视场角（度）。</summary>
+        Public Property FieldOfView As Double
+        ''' <summary>像素焦距 fx = fy。</summary>
+        Public Property FocalPixels As Double
+        ''' <summary>目标帧率（Hz）。</summary>
+        Public Property Rate As Double
+        ''' <summary>实测帧率。</summary>
+        Public Property Fps As Double
+        ''' <summary>最近一帧的渲染耗时（毫秒）。</summary>
+        Public Property CaptureMs As Double
+
+        ''' <summary>光心世界坐标 [x, y, z]。</summary>
+        Public Property Position As Double()
+        ''' <summary>光轴姿态 [roll, pitch, yaw]（度）。</summary>
+        Public Property Rpy As Double()
+
+        ''' <summary>最近一帧对应的仿真时间。</summary>
+        Public Property Time As Double
+        Public Property StepIndex As Long
+
+    End Class
+
     ''' <summary>场景中的一个积木物体。</summary>
     Public Class ObjectState
 
@@ -78,6 +108,9 @@ Namespace Simulation
 
         Public Property Joints As List(Of JointState)
         Public Property Gripper As GripperState
+
+        ''' <summary>夹爪相机摘要（无像素）。</summary>
+        Public Property Camera As CameraState
 
         ''' <summary>当前接触对，形如 "link2|block-3"。</summary>
         Public Property Collisions As List(Of String)

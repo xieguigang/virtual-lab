@@ -42,6 +42,8 @@ Partial Class FormVirtualLab
     Friend WithEvents m_numGripForce As NumericUpDown
     Friend WithEvents m_btnGrip As Button
     Friend WithEvents m_btnRelease As Button
+    Friend WithEvents m_picCamera As PictureBox
+    Friend WithEvents m_lblCamera As Label
     Friend WithEvents m_lstObjects As ListBox
     Friend WithEvents m_log As RichTextBox
     Friend WithEvents m_status As StatusStrip
@@ -62,8 +64,8 @@ Partial Class FormVirtualLab
         Me.SuspendLayout()
         Me.AutoScaleDimensions = New SizeF(7.0F, 15.0F)
         Me.AutoScaleMode = AutoScaleMode.Font
-        Me.ClientSize = New Size(1240, 800)
-        Me.MinimumSize = New Size(1180, 720)
+        Me.ClientSize = New Size(1440, 980)
+        Me.MinimumSize = New Size(1180, 780)
         Me.BackColor = UiTheme.Background
         Me.ForeColor = UiTheme.TextPrimary
         Me.Font = UiTheme.FontUi
@@ -154,8 +156,11 @@ Partial Class FormVirtualLab
         Me.m_side.BackColor = UiTheme.Background
         Me.m_side.Padding = New Padding(8)
 
+        ' 卡片总高会超过面板高度，用滚动条兜底（夹爪相机固定在最上方）
+        Me.m_side.AutoScroll = True
+
         Dim jointCard As Panel = UiTheme.CreateCard("关节状态")
-        jointCard.Height = 232
+        jointCard.Height = 200
 
         Dim jointsHost As New Panel With {
             .Dock = DockStyle.Fill,
@@ -276,8 +281,35 @@ Partial Class FormVirtualLab
         gripFlow.Controls.Add(forceLabel)
         gripCard.Controls.Add(gripFlow)
 
+        ' ---------------- 夹爪相机（第一视角） ----------------
+        Dim cameraCard As Panel = UiTheme.CreateCard("夹爪相机 · 第一视角")
+        cameraCard.Height = 200
+
+        Me.m_picCamera = New PictureBox With {
+            .Dock = DockStyle.Top,
+            .Height = 140,
+            .BackColor = UiTheme.Background,
+            .SizeMode = PictureBoxSizeMode.Zoom,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .Margin = New Padding(0)
+        }
+
+        Me.m_lblCamera = New Label With {
+            .Text = "等待相机第一帧…",
+            .Dock = DockStyle.Fill,
+            .ForeColor = UiTheme.TextMuted,
+            .Font = UiTheme.FontMonoSmall,
+            .BackColor = Color.Transparent,
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        ' 先加 Top 的图片框、再加 Fill 的标签，停靠顺序才是"标题 → 画面 → 读数"
+        cameraCard.Controls.Add(Me.m_picCamera)
+        cameraCard.Controls.Add(Me.m_lblCamera)
+
         Dim objectCard As Panel = UiTheme.CreateCard("场景物体")
-        objectCard.Dock = DockStyle.Fill
+        objectCard.Dock = DockStyle.Top
+        objectCard.Height = 124
 
         Me.m_lstObjects = New ListBox With {
             .Dock = DockStyle.Fill,
@@ -289,14 +321,17 @@ Partial Class FormVirtualLab
         }
         objectCard.Controls.Add(Me.m_lstObjects)
 
+        ' Dock=Top 的卡片：后添加的排在更上面。
+        ' 夹爪相机放最上面，保证窗口矮的时候也一直能看见第一视角
         Me.m_side.Controls.Add(objectCard)
         Me.m_side.Controls.Add(gripCard)
         Me.m_side.Controls.Add(tcpCard)
         Me.m_side.Controls.Add(jointCard)
+        Me.m_side.Controls.Add(cameraCard)
 
         ' ---------------- 底部日志 ----------------
         Me.m_bottom.Dock = DockStyle.Bottom
-        Me.m_bottom.Height = 156
+        Me.m_bottom.Height = 140
         Me.m_bottom.BackColor = UiTheme.PanelColor
         Me.m_bottom.Padding = New Padding(10, 6, 10, 6)
 

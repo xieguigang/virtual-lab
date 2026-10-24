@@ -38,6 +38,11 @@ Namespace Protocol
         Public Const CmdConfig As String = "config"
         Public Const CmdSimStep As String = "sim_step"
 
+        ''' <summary>取一帧夹爪相机图像。</summary>
+        Public Const CmdFrame As String = "frame"
+        ''' <summary>查询/修改夹爪相机参数。</summary>
+        Public Const CmdCamera As String = "camera"
+
         ' ---- 错误码 ----
         Public Const ErrUnknownCommand As String = "unknown_command"
         Public Const ErrBadParams As String = "bad_params"
@@ -72,6 +77,14 @@ Namespace Protocol
         Public Const FieldJoints As String = "joints"
         Public Const FieldModel As String = "model"
         Public Const FieldSimMode As String = "simMode"
+
+        ' ---- 相机字段 ----
+        Public Const FieldWidth As String = "width"
+        Public Const FieldHeight As String = "height"
+        Public Const FieldFormat As String = "format"
+        Public Const FieldDepth As String = "depth"
+        Public Const FieldCamera As String = "camera"
+        Public Const FieldRgb As String = "rgb"
 
         ''' <summary>把异常包装成协议错误对象。</summary>
         Public Function ErrorNode(code As String, message As String) As System.Text.Json.Nodes.JsonObject

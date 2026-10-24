@@ -1,6 +1,7 @@
 Imports System.IO
 Imports VirtualWorkshop.Configuration
 Imports VirtualWorkshop.Model
+Imports VirtualWorkshop.Sensing
 
 Namespace Simulation
 
@@ -62,7 +63,23 @@ Namespace Simulation
 
             preset.Simulation = New ArmSimulation(preset.Assembly, simOptions)
             preset.Hardware = New ArmHardware(preset.Simulation)
-            preset.Host = New SimulationHost(preset.Simulation, preset.Hardware)
+
+            Dim camera As GripperCamera = Nothing
+
+            If options.CameraEnabled Then
+                Dim cameraConfig As New CameraConfig With {
+                    .Enabled = True,
+                    .Width = options.CameraWidth,
+                    .Height = options.CameraHeight,
+                    .FieldOfView = options.CameraFov,
+                    .Rate = options.CameraRate,
+                    .Offset = options.CameraOffset
+                }
+
+                camera = New GripperCamera(cameraConfig)
+            End If
+
+            preset.Host = New SimulationHost(preset.Simulation, preset.Hardware, camera)
 
             preset.Host.Dispatcher.ModelName = "six_axis_arm"
             preset.Host.Dispatcher.TcpPort = options.TcpPort

@@ -106,7 +106,16 @@ Namespace Protocol
                         If parts.Length < 2 Then Return
 
                         Dim method As String = parts(0).ToUpperInvariant()
-                        Dim path As String = parts(1)
+                        Dim rawPath As String = parts(1)
+
+                        Dim question As Integer = rawPath.IndexOf("?"c)
+                        Dim query As String = ""
+                        Dim path As String = rawPath
+
+                        If question >= 0 Then
+                            query = rawPath.Substring(question + 1)
+                            path = rawPath.Substring(0, question)
+                        End If
 
                         Dim contentLength As Integer = 0
 
@@ -138,9 +147,11 @@ Namespace Protocol
                         End If
 
                         Dim status As Integer = 200
-                        Dim payload As String
+                        Dim payload As String = Nothing
+                        Dim binary As Byte() = Nothing
+                        Dim contentType As String = JsonContentType
 
-                        Select Case path.Split("?"c)(0).TrimEnd("/"c)
+                        Select Case path.TrimEnd("/"c)
                             Case "/health", "/api/v1/health"
                                 payload = JsonText.Stringify(New JsonObject From {{"ok", True}})
 
@@ -155,6 +166,40 @@ Namespace Protocol
                                     payload = ExecuteCommand(body)
                                 End If
 
+                            Case "/api/v1/frame"
+                                ' 直接返回二进制图像，浏览器/curl 可以直接存成文件
+                                Dim frameArgs As JsonObject = ParseQuery(query)
+                                Dim format As String = JsonText.Str(frameArgs, ProtocolText.FieldFormat, "png")
+
+                                Dim frame As JsonObject = CaptureFrame(frameArgs)
+
+                                If frame Is Nothing Then
+                                    status = 500
+                                    payload = JsonText.Stringify(ErrorBody(ProtocolText.ErrTimeout, "取帧超时"))
+                                Else
+                                    Dim data As String = JsonText.Str(frame, "data")
+
+                                    If String.IsNullOrEmpty(data) Then
+                                        status = 400
+                                        payload = JsonText.Stringify(ErrorBody(ProtocolText.ErrBadParams, "没有图像数据"))
+                                    Else
+                                        binary = Convert.FromBase64String(data)
+                                        contentType = If(String.Equals(format, "png", StringComparison.OrdinalIgnoreCase),
+                                                          "image/png", "application/octet-stream")
+                                    End If
+                                End If
+
+                            Case "/api/v1/frame.json"
+                                Dim frameArgs As JsonObject = ParseQuery(query)
+                                Dim frame As JsonObject = CaptureFrame(frameArgs)
+
+                                If frame Is Nothing Then
+                                    status = 500
+                                    payload = JsonText.Stringify(ErrorBody(ProtocolText.ErrTimeout, "取帧超时"))
+                                Else
+                                    payload = JsonText.Stringify(frame)
+                                End If
+
                             Case ""
                                 payload = JsonText.Stringify(New JsonObject From {
                                     {"name", "VirtualWorkshop 虚拟六轴机械臂"},
@@ -162,7 +207,9 @@ Namespace Protocol
                                     {"endpoints", New JsonArray From {
                                         JsonValue.Create("GET /health"),
                                         JsonValue.Create("GET /api/v1/state"),
-                                        JsonValue.Create("POST /api/v1/command")
+                                        JsonValue.Create("POST /api/v1/command"),
+                                        JsonValue.Create("GET /api/v1/frame?format=png&depth=f32"),
+                                        JsonValue.Create("GET /api/v1/frame.json")
                                     }}
                                 })
 
@@ -171,7 +218,11 @@ Namespace Protocol
                                 payload = JsonText.Stringify(ErrorBody(ProtocolText.ErrNotFound, "未知路径: " & path))
                         End Select
 
-                        Call WriteResponse(stream, status, payload)
+                        If binary IsNot Nothing Then
+                            Call WriteBinaryResponse(stream, status, contentType, binary)
+                        Else
+                            Call WriteResponse(stream, status, payload, contentType)
+                        End If
                     End Using
                 End Using
             Catch ex As Exception
@@ -226,13 +277,73 @@ Namespace Protocol
             }
         End Function
 
-        Private Shared Sub WriteResponse(stream As NetworkStream, status As Integer, payload As String)
+        Private Const JsonContentType As String = "application/json; charset=utf-8"
+
+        ''' <summary>把 "a=1&amp;b=abc" 解析成参数对象（数字/布尔自动转换）。</summary>
+        Private Shared Function ParseQuery(query As String) As JsonObject
+            Dim args As New JsonObject()
+
+            If String.IsNullOrEmpty(query) Then Return args
+
+            For Each pair As String In query.Split("&"c)
+                If pair.Length = 0 Then Continue For
+
+                Dim kv As String() = pair.Split("="c)
+                Dim key As String = Uri.UnescapeDataString(kv(0))
+                Dim value As String = If(kv.Length > 1, Uri.UnescapeDataString(kv(1)), "")
+
+                If key.Length = 0 Then Continue For
+
+                Dim number As Double
+
+                If Double.TryParse(value, number) Then
+                    args(key) = JsonValue.Create(number)
+                ElseIf String.Equals(value, "true", StringComparison.OrdinalIgnoreCase) Then
+                    args(key) = JsonValue.Create(True)
+                ElseIf String.Equals(value, "false", StringComparison.OrdinalIgnoreCase) Then
+                    args(key) = JsonValue.Create(False)
+                Else
+                    args(key) = JsonValue.Create(value)
+                End If
+            Next
+
+            Return args
+        End Function
+
+        ''' <summary>在仿真线程上取一帧；失败返回 Nothing。</summary>
+        Private Function CaptureFrame(args As JsonObject) As JsonObject
+            Try
+                Dim task As Task(Of JsonObject) = Host.Post(ProtocolText.CmdFrame, args)
+
+                If Not task.Wait(30000) Then Return Nothing
+
+                Return task.Result
+            Catch ex As Exception
+                Return Nothing
+            End Try
+        End Function
+
+        Private Shared Sub WriteResponse(stream As NetworkStream, status As Integer, payload As String,
+                                        Optional contentType As String = JsonContentType)
+
+            If payload Is Nothing Then payload = "{}"
+
             Dim bytes As Byte() = Encoding.UTF8.GetBytes(payload)
-            Dim reason As String = If(status = 200, "OK", If(status = 404, "Not Found", If(status = 405, "Method Not Allowed", "Bad Request")))
+
+            Call WriteBinaryResponse(stream, status, contentType, bytes)
+        End Sub
+
+        Private Shared Sub WriteBinaryResponse(stream As NetworkStream, status As Integer,
+                                               contentType As String, bytes As Byte())
+
+            Dim reason As String = If(status = 200, "OK",
+                                      If(status = 404, "Not Found",
+                                         If(status = 405, "Method Not Allowed",
+                                            If(status = 500, "Internal Server Error", "Bad Request"))))
 
             Dim header As String =
                 $"HTTP/1.1 {status} {reason}{vbCrLf}" &
-                $"Content-Type: application/json; charset=utf-8{vbCrLf}" &
+                $"Content-Type: {If(contentType, JsonContentType)}{vbCrLf}" &
                 $"Content-Length: {bytes.Length}{vbCrLf}" &
                 $"Access-Control-Allow-Origin: *{vbCrLf}" &
                 $"Connection: close{vbCrLf}{vbCrLf}"

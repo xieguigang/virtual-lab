@@ -7,6 +7,7 @@ Imports VirtualWorkshop.Configuration
 Imports VirtualWorkshop.Model
 Imports VirtualWorkshop.Protocol
 Imports VirtualWorkshop.Rendering
+Imports VirtualWorkshop.Sensing
 Imports VirtualWorkshop.Simulation
 
 ''' <summary>虚拟硬件仿真工作台主窗体。</summary>
@@ -28,6 +29,9 @@ Public Class FormVirtualLab
 
     Private _tcp As TcpServer
     Private _http As HttpServer
+
+    ''' <summary>上一次显示的相机帧时间（避免同帧重复解码）。</summary>
+    Private _lastCameraTime As Double = -1.0
 
     Public Sub New(options As SimulationOptions, preset As SimulationPreset)
         InitializeComponent()
@@ -74,6 +78,17 @@ Public Class FormVirtualLab
         m_timer.Start()
     End Sub
 
+    Private Sub FormVirtualLab_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        Try
+            If m_picCamera IsNot Nothing AndAlso m_picCamera.Image IsNot Nothing Then
+                m_picCamera.Image.Dispose()
+                m_picCamera.Image = Nothing
+            End If
+        Catch ex As Exception
+            ' 忽略
+        End Try
+    End Sub
+
     Private Shared Function CDecimal(value As Double) As Decimal
         Dim clamped As Double = System.Math.Max(0.0, System.Math.Min(20.0, value))
 
@@ -116,6 +131,8 @@ Public Class FormVirtualLab
                 Call LogLine("渲染失败: " & ex.Message, UiTheme.Danger)
                 _render.Enabled = False
             End Try
+
+            Call UpdateCameraPanel()
         End If
 
         _uiAccumulator += elapsed
@@ -204,6 +221,46 @@ Public Class FormVirtualLab
         Finally
             _suppressSlider = False
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' 把夹爪相机的最新帧画到右侧卡片。
+    ''' </summary>
+    ''' <remarks>
+    ''' 只读 <see cref="GripperCamera.Latest"/>（仿真线程发布的不可变帧），
+    ''' 不在 UI 线程遍历物理世界；同一帧只解码一次，旧位图立刻释放。
+    ''' </remarks>
+    Private Sub UpdateCameraPanel()
+        Dim camera As GripperCamera = Host?.Camera
+
+        If camera Is Nothing OrElse m_picCamera Is Nothing Then Return
+
+        Dim frame As CameraFrame = camera.Latest
+
+        If frame Is Nothing Then
+            m_lblCamera.Text = "等待相机第一帧…"
+            Return
+        End If
+
+        If frame.Time = _lastCameraTime AndAlso m_picCamera.Image IsNot Nothing Then Return
+
+        _lastCameraTime = frame.Time
+
+        Try
+            Dim bitmap As Bitmap = frame.ToBitmap()
+            Dim previous As Image = m_picCamera.Image
+
+            m_picCamera.Image = bitmap
+
+            previous?.Dispose()
+        Catch ex As Exception
+            ' 画面渲染失败不影响仿真
+        End Try
+
+        Dim rpy As Double() = If(frame.Pose Is Nothing, Nothing, frame.Pose.RpyDegrees())
+
+        m_lblCamera.Text = $"{frame.Width}x{frame.Height} · {camera.Fps:F1} fps · {camera.LastCaptureMs:F1} ms" &
+                           If(rpy Is Nothing, "", vbCrLf & $"rpy {rpy(0):F0}° / {rpy(1):F0}° / {rpy(2):F0}°")
     End Sub
 
     Private Sub UpdateObjectList(state As StateSnapshot)
