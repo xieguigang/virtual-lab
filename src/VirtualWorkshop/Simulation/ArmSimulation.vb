@@ -726,16 +726,7 @@ Namespace Simulation
         ''' <c>Finger_L|block-3</c> 或 <c>block-3|Finger_L</c>。
         ''' </remarks>
         Private Sub UpdateFingerContact()
-            Dim touching As Boolean = False
-
-            For Each text As String In LastCollisions
-                If String.IsNullOrEmpty(text) Then Continue For
-                If text.IndexOf("Finger", StringComparison.OrdinalIgnoreCase) < 0 Then Continue For
-                If text.IndexOf("block-", StringComparison.OrdinalIgnoreCase) < 0 Then Continue For
-
-                touching = True
-                Exit For
-            Next
+            Dim touching As Boolean = FingersTouchingObject() IsNot Nothing
 
             If touching AndAlso Not _fingerContact Then
                 _fingerContactExtension = _fingerExtension
@@ -743,6 +734,30 @@ Namespace Simulation
 
             _fingerContact = touching
         End Sub
+
+        ''' <summary>
+        ''' 几何判定：哪块物体的包围盒同时碰到某根手指（没有则返回 <c>Nothing</c>）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 不能只依赖物理引擎的接触流形：手指是静态刚体，闭合过程中实测常常不生成
+        ''' <c>Manifold3D</c>，于是"夹紧"永远检测不到接触、手指一直闭合到互相穿透，
+        ''' 把积木顶飞。包围盒相交是保守判定，宁可早一点夹住。
+        ''' </remarks>
+        Public Function FingersTouchingObject() As String
+            If FingerBodies.Count = 0 Then Return Nothing
+
+            For Each item As BlockInstance In Objects
+                If item.Body Is Nothing Then Continue For
+
+                Dim target As AABB3D = item.Body.GetAABB()
+
+                For Each finger As RigidBody3D In FingerBodies
+                    If finger.GetAABB().Overlaps(target) Then Return item.Id
+                Next
+            Next
+
+            Return Nothing
+        End Function
 
         ''' <summary>重建整个世界（场景复位）。</summary>
         Public Sub Reset()
@@ -1329,7 +1344,8 @@ Namespace Simulation
                 })
             Next
 
-            Dim holdingId As String = Nothing
+            ' 优先用几何判定（手指是静态刚体，接触流形不一定生成）
+            Dim holdingId As String = FingersTouchingObject()
 
             For Each pairText As String In LastCollisions
                 Dim parts As String() = pairText.Split("|"c)
