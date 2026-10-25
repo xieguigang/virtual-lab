@@ -88,718 +88,958 @@ Partial Class FormVirtualLab
 
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
-        ' ---------------- 控件创建 ----------------
-        Me.components = New System.ComponentModel.Container()
-
-        Me.m_top = New Panel()
-        Me.m_side = New FlowLayoutPanel()
-        Me.m_bottom = New Panel()
-        Me.m_viewport = New Panel()
-        Me.m_canvas = New Microsoft.VisualBasic.Drawing.DirectX.DxScene3DCanvas()
-        Me.m_timer = New System.Windows.Forms.Timer(Me.components)
-
-        Me.m_btnStart = New Button()
-        Me.m_btnStopServer = New Button()
-        Me.m_btnEnable = New Button()
-        Me.m_btnHome = New Button()
-        Me.m_btnHold = New Button()
-        Me.m_btnEstop = New Button()
-        Me.m_btnReset = New Button()
-
-        Me.brand = New Label()
-        Me.flow = New FlowLayoutPanel()
-        Me.realtimeLabel = New Label()
-        Me.m_numRealtime = New NumericUpDown()
-        Me.m_lblService = New Label()
-
-        Me.jointCard = New Panel()
-        Me.jointCardHeader = New Label()
-        Me.jointsHost = New Panel()
-        Me.m_jointBar0 = New TrackBar()
-        Me.m_jointLabel0 = New Label()
-        Me.m_jointName0 = New Label()
-        Me.m_jointBar1 = New TrackBar()
-        Me.m_jointLabel1 = New Label()
-        Me.m_jointName1 = New Label()
-        Me.m_jointBar2 = New TrackBar()
-        Me.m_jointLabel2 = New Label()
-        Me.m_jointName2 = New Label()
-        Me.m_jointBar3 = New TrackBar()
-        Me.m_jointLabel3 = New Label()
-        Me.m_jointName3 = New Label()
-        Me.m_jointBar4 = New TrackBar()
-        Me.m_jointLabel4 = New Label()
-        Me.m_jointName4 = New Label()
-        Me.m_jointBar5 = New TrackBar()
-        Me.m_jointLabel5 = New Label()
-        Me.m_jointName5 = New Label()
-
-        Me.tcpCard = New Panel()
-        Me.tcpCardHeader = New Label()
-        Me.m_lblTcp = New Label()
-
-        Me.gripCard = New Panel()
-        Me.gripCardHeader = New Label()
-        Me.gripFlow = New FlowLayoutPanel()
-        Me.m_lblGripper = New Label()
-        Me.m_btnRelease = New Button()
-        Me.m_btnGrip = New Button()
-        Me.m_numGripForce = New NumericUpDown()
-        Me.forceLabel = New Label()
-
-        Me.cameraCard = New Panel()
-        Me.cameraCardHeader = New Label()
-        Me.m_picCamera = New PictureBox()
-        Me.m_lblCamera = New Label()
-
-        Me.objectCard = New Panel()
-        Me.objectCardHeader = New Label()
-        Me.m_lstObjects = New ListBox()
-
-        Me.m_log = New RichTextBox()
-
-        Me.m_status = New StatusStrip()
-        Me.m_statusLabel = New ToolStripStatusLabel()
-        Me.m_lblStats = New Label()
-
-        ' ---------------- 窗体 ----------------
-        Me.SuspendLayout()
-        Me.AutoScaleDimensions = New SizeF(7.0F, 15.0F)
-        Me.AutoScaleMode = AutoScaleMode.Font
-        Me.ClientSize = New Size(1440, 980)
-        Me.MinimumSize = New Size(1180, 780)
-        Me.BackColor = Color.White
-        Me.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.Text = "VirtualWorkshop · 六轴机械臂虚拟硬件仿真工作台"
-        Me.DoubleBuffered = True
-
-        ' ---------------- 顶部工具栏 ----------------
-        Me.m_top.Dock = DockStyle.Top
-        Me.m_top.Height = 60
-        Me.m_top.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_top.Padding = New Padding(12, 0, 12, 0)
-
-        Me.brand.Text = "VIRTUAL WORKSHOP"
-        Me.brand.AutoSize = False
-        Me.brand.Width = 190
-        Me.brand.Dock = DockStyle.Left
-        Me.brand.TextAlign = ContentAlignment.MiddleLeft
-        Me.brand.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.brand.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.brand.BackColor = Color.Transparent
-
-        Me.flow.Dock = DockStyle.Left
-        Me.flow.Width = 780
-        Me.flow.FlowDirection = FlowDirection.LeftToRight
-        Me.flow.WrapContents = False
-        Me.flow.Padding = New Padding(0, 14, 0, 0)
-        Me.flow.BackColor = Color.Transparent
-
-        ' m_btnStart（主按钮：blue-600 实心白字，无边框）
-        Me.m_btnStart.Text = "启动服务"
-        Me.m_btnStart.Width = 92
-        Me.m_btnStart.Height = 32
-        Me.m_btnStart.FlatStyle = FlatStyle.Flat
-        Me.m_btnStart.BackColor = Color.FromArgb(37, 99, 235)
-        Me.m_btnStart.ForeColor = Color.White
-        Me.m_btnStart.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnStart.Cursor = Cursors.Hand
-        Me.m_btnStart.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnStart.TabStop = False
-        Me.m_btnStart.UseVisualStyleBackColor = False
-        Me.m_btnStart.FlatAppearance.BorderSize = 0
-        Me.m_btnStart.FlatAppearance.MouseOverBackColor = Color.FromArgb(29, 78, 216)
-        Me.m_btnStart.FlatAppearance.MouseDownBackColor = Color.FromArgb(29, 78, 216)
-
-        ' m_btnStopServer（描边按钮：Warn）
-        Me.m_btnStopServer.Text = "停止服务"
-        Me.m_btnStopServer.Width = 92
-        Me.m_btnStopServer.Height = 30
-        Me.m_btnStopServer.FlatStyle = FlatStyle.Flat
-        Me.m_btnStopServer.BackColor = Color.White
-        Me.m_btnStopServer.ForeColor = Color.FromArgb(245, 158, 11)
-        Me.m_btnStopServer.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnStopServer.Cursor = Cursors.Hand
-        Me.m_btnStopServer.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnStopServer.TabStop = False
-        Me.m_btnStopServer.FlatAppearance.BorderSize = 1
-        Me.m_btnStopServer.FlatAppearance.BorderColor = Color.FromArgb(245, 158, 11)
-        Me.m_btnStopServer.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnStopServer.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnEnable（描边按钮：Accent）
-        Me.m_btnEnable.Text = "伺服使能"
-        Me.m_btnEnable.Width = 92
-        Me.m_btnEnable.Height = 30
-        Me.m_btnEnable.FlatStyle = FlatStyle.Flat
-        Me.m_btnEnable.BackColor = Color.White
-        Me.m_btnEnable.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnEnable.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnEnable.Cursor = Cursors.Hand
-        Me.m_btnEnable.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnEnable.TabStop = False
-        Me.m_btnEnable.FlatAppearance.BorderSize = 1
-        Me.m_btnEnable.FlatAppearance.BorderColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnEnable.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnEnable.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnHome（描边按钮：Accent）
-        Me.m_btnHome.Text = "回零"
-        Me.m_btnHome.Width = 92
-        Me.m_btnHome.Height = 30
-        Me.m_btnHome.FlatStyle = FlatStyle.Flat
-        Me.m_btnHome.BackColor = Color.White
-        Me.m_btnHome.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnHome.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnHome.Cursor = Cursors.Hand
-        Me.m_btnHome.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnHome.TabStop = False
-        Me.m_btnHome.FlatAppearance.BorderSize = 1
-        Me.m_btnHome.FlatAppearance.BorderColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnHome.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnHome.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnHold（描边按钮：AccentDim）
-        Me.m_btnHold.Text = "保持"
-        Me.m_btnHold.Width = 92
-        Me.m_btnHold.Height = 30
-        Me.m_btnHold.FlatStyle = FlatStyle.Flat
-        Me.m_btnHold.BackColor = Color.White
-        Me.m_btnHold.ForeColor = Color.FromArgb(100, 116, 139)
-        Me.m_btnHold.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnHold.Cursor = Cursors.Hand
-        Me.m_btnHold.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnHold.TabStop = False
-        Me.m_btnHold.FlatAppearance.BorderSize = 1
-        Me.m_btnHold.FlatAppearance.BorderColor = Color.FromArgb(100, 116, 139)
-        Me.m_btnHold.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnHold.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnEstop（描边按钮：Danger，72 宽）
-        Me.m_btnEstop.Text = "急停"
-        Me.m_btnEstop.Width = 72
-        Me.m_btnEstop.Height = 30
-        Me.m_btnEstop.FlatStyle = FlatStyle.Flat
-        Me.m_btnEstop.BackColor = Color.White
-        Me.m_btnEstop.ForeColor = Color.FromArgb(220, 38, 38)
-        Me.m_btnEstop.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnEstop.Cursor = Cursors.Hand
-        Me.m_btnEstop.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnEstop.TabStop = False
-        Me.m_btnEstop.FlatAppearance.BorderSize = 1
-        Me.m_btnEstop.FlatAppearance.BorderColor = Color.FromArgb(220, 38, 38)
-        Me.m_btnEstop.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnEstop.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnReset（描边按钮：Warn）
-        Me.m_btnReset.Text = "复位场景"
-        Me.m_btnReset.Width = 92
-        Me.m_btnReset.Height = 30
-        Me.m_btnReset.FlatStyle = FlatStyle.Flat
-        Me.m_btnReset.BackColor = Color.White
-        Me.m_btnReset.ForeColor = Color.FromArgb(245, 158, 11)
-        Me.m_btnReset.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnReset.Cursor = Cursors.Hand
-        Me.m_btnReset.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnReset.TabStop = False
-        Me.m_btnReset.FlatAppearance.BorderSize = 1
-        Me.m_btnReset.FlatAppearance.BorderColor = Color.FromArgb(245, 158, 11)
-        Me.m_btnReset.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnReset.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        Me.realtimeLabel.Text = "倍率"
-        Me.realtimeLabel.AutoSize = True
-        Me.realtimeLabel.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.realtimeLabel.Margin = New Padding(12, 6, 4, 0)
-
-        Me.m_numRealtime.DecimalPlaces = 1
-        Me.m_numRealtime.Minimum = 0D
-        Me.m_numRealtime.Maximum = 20D
-        Me.m_numRealtime.Increment = 0.5D
-        Me.m_numRealtime.Value = 1D
-        Me.m_numRealtime.Width = 62
-        Me.m_numRealtime.BackColor = Color.White
-        Me.m_numRealtime.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_numRealtime.BorderStyle = BorderStyle.FixedSingle
-        Me.m_numRealtime.Margin = New Padding(0, 2, 0, 0)
-
-        Me.flow.Controls.Add(Me.m_btnStart)
-        Me.flow.Controls.Add(Me.m_btnStopServer)
-        Me.flow.Controls.Add(Me.m_btnEnable)
-        Me.flow.Controls.Add(Me.m_btnHome)
-        Me.flow.Controls.Add(Me.m_btnHold)
-        Me.flow.Controls.Add(Me.m_btnEstop)
-        Me.flow.Controls.Add(Me.m_btnReset)
-        Me.flow.Controls.Add(Me.realtimeLabel)
-        Me.flow.Controls.Add(Me.m_numRealtime)
-
-        Me.m_lblService.Text = "离线"
-        Me.m_lblService.Dock = DockStyle.Right
-        Me.m_lblService.Width = 250
-        Me.m_lblService.TextAlign = ContentAlignment.MiddleRight
-        Me.m_lblService.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_lblService.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-        Me.m_lblService.BackColor = Color.Transparent
-
-        Me.m_top.Controls.Add(Me.flow)
-        Me.m_top.Controls.Add(Me.brand)
-        Me.m_top.Controls.Add(Me.m_lblService)
-
-        ' ---------------- 右侧仪表面板 ----------------
-        Me.m_side.Dock = DockStyle.Right
-        Me.m_side.Width = 386
-        Me.m_side.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_side.Padding = New Padding(8)
-        Me.m_side.AutoScroll = True
-        Me.m_side.FlowDirection = FlowDirection.TopDown
-        Me.m_side.WrapContents = False
-
-        ' 关节状态卡片
-        Me.jointCard.Dock = DockStyle.None
-        Me.jointCard.Width = 352
-        Me.jointCard.Height = 200
-        Me.jointCard.Margin = New Padding(0, 0, 0, 8)
-        Me.jointCard.BackColor = Color.White
-        Me.jointCard.Padding = New Padding(12, 10, 12, 10)
-
-        Me.jointCardHeader.Text = "关节状态"
-        Me.jointCardHeader.Dock = DockStyle.Top
-        Me.jointCardHeader.Height = 22
-        Me.jointCardHeader.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.jointCardHeader.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.jointCardHeader.BackColor = Color.Transparent
-        Me.jointCard.Controls.Add(Me.jointCardHeader)
-
-        Me.jointsHost.Dock = DockStyle.Fill
-        Me.jointsHost.AutoScroll = True
-        Me.jointsHost.Padding = New Padding(0, 4, 0, 0)
-        Me.jointsHost.BackColor = Color.Transparent
-        Me.jointCard.Controls.Add(Me.jointsHost)
-
-        ' 关节 1 (J1 腰)
-        Me.m_jointName0.Text = "J1 腰"
-        Me.m_jointName0.Left = 0
-        Me.m_jointName0.Top = 4
-        Me.m_jointName0.Width = 52
-        Me.m_jointName0.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName0.BackColor = Color.Transparent
-        Me.m_jointName0.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar0.Left = 54
-        Me.m_jointBar0.Top = 0
-        Me.m_jointBar0.Width = 232
-        Me.m_jointBar0.Height = 26
-        Me.m_jointBar0.Minimum = -1000
-        Me.m_jointBar0.Maximum = 1000
-        Me.m_jointBar0.TickStyle = TickStyle.None
-        Me.m_jointBar0.SmallChange = 5
-        Me.m_jointBar0.LargeChange = 50
-        Me.m_jointBar0.Value = 0
-
-        Me.m_jointLabel0.Text = "0.000"
-        Me.m_jointLabel0.Left = 292
-        Me.m_jointLabel0.Top = 4
-        Me.m_jointLabel0.Width = 58
-        Me.m_jointLabel0.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel0.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel0.BackColor = Color.Transparent
-        Me.m_jointLabel0.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName0)
-        Me.jointsHost.Controls.Add(Me.m_jointBar0)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel0)
-
-        ' 关节 2 (J2 肩)
-        Me.m_jointName1.Text = "J2 肩"
-        Me.m_jointName1.Left = 0
-        Me.m_jointName1.Top = 32
-        Me.m_jointName1.Width = 52
-        Me.m_jointName1.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName1.BackColor = Color.Transparent
-        Me.m_jointName1.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar1.Left = 54
-        Me.m_jointBar1.Top = 28
-        Me.m_jointBar1.Width = 232
-        Me.m_jointBar1.Height = 26
-        Me.m_jointBar1.Minimum = -1000
-        Me.m_jointBar1.Maximum = 1000
-        Me.m_jointBar1.TickStyle = TickStyle.None
-        Me.m_jointBar1.SmallChange = 5
-        Me.m_jointBar1.LargeChange = 50
-        Me.m_jointBar1.Value = 0
-
-        Me.m_jointLabel1.Text = "0.000"
-        Me.m_jointLabel1.Left = 292
-        Me.m_jointLabel1.Top = 32
-        Me.m_jointLabel1.Width = 58
-        Me.m_jointLabel1.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel1.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel1.BackColor = Color.Transparent
-        Me.m_jointLabel1.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName1)
-        Me.jointsHost.Controls.Add(Me.m_jointBar1)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel1)
-
-        ' 关节 3 (J3 肘)
-        Me.m_jointName2.Text = "J3 肘"
-        Me.m_jointName2.Left = 0
-        Me.m_jointName2.Top = 60
-        Me.m_jointName2.Width = 52
-        Me.m_jointName2.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName2.BackColor = Color.Transparent
-        Me.m_jointName2.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar2.Left = 54
-        Me.m_jointBar2.Top = 56
-        Me.m_jointBar2.Width = 232
-        Me.m_jointBar2.Height = 26
-        Me.m_jointBar2.Minimum = -1000
-        Me.m_jointBar2.Maximum = 1000
-        Me.m_jointBar2.TickStyle = TickStyle.None
-        Me.m_jointBar2.SmallChange = 5
-        Me.m_jointBar2.LargeChange = 50
-        Me.m_jointBar2.Value = 0
-
-        Me.m_jointLabel2.Text = "0.000"
-        Me.m_jointLabel2.Left = 292
-        Me.m_jointLabel2.Top = 60
-        Me.m_jointLabel2.Width = 58
-        Me.m_jointLabel2.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel2.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel2.BackColor = Color.Transparent
-        Me.m_jointLabel2.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName2)
-        Me.jointsHost.Controls.Add(Me.m_jointBar2)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel2)
-
-        ' 关节 4 (J4 腕转)
-        Me.m_jointName3.Text = "J4 腕转"
-        Me.m_jointName3.Left = 0
-        Me.m_jointName3.Top = 88
-        Me.m_jointName3.Width = 52
-        Me.m_jointName3.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName3.BackColor = Color.Transparent
-        Me.m_jointName3.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar3.Left = 54
-        Me.m_jointBar3.Top = 84
-        Me.m_jointBar3.Width = 232
-        Me.m_jointBar3.Height = 26
-        Me.m_jointBar3.Minimum = -1000
-        Me.m_jointBar3.Maximum = 1000
-        Me.m_jointBar3.TickStyle = TickStyle.None
-        Me.m_jointBar3.SmallChange = 5
-        Me.m_jointBar3.LargeChange = 50
-        Me.m_jointBar3.Value = 0
-
-        Me.m_jointLabel3.Text = "0.000"
-        Me.m_jointLabel3.Left = 292
-        Me.m_jointLabel3.Top = 88
-        Me.m_jointLabel3.Width = 58
-        Me.m_jointLabel3.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel3.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel3.BackColor = Color.Transparent
-        Me.m_jointLabel3.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName3)
-        Me.jointsHost.Controls.Add(Me.m_jointBar3)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel3)
-
-        ' 关节 5 (J5 腕摆)
-        Me.m_jointName4.Text = "J5 腕摆"
-        Me.m_jointName4.Left = 0
-        Me.m_jointName4.Top = 116
-        Me.m_jointName4.Width = 52
-        Me.m_jointName4.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName4.BackColor = Color.Transparent
-        Me.m_jointName4.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar4.Left = 54
-        Me.m_jointBar4.Top = 112
-        Me.m_jointBar4.Width = 232
-        Me.m_jointBar4.Height = 26
-        Me.m_jointBar4.Minimum = -1000
-        Me.m_jointBar4.Maximum = 1000
-        Me.m_jointBar4.TickStyle = TickStyle.None
-        Me.m_jointBar4.SmallChange = 5
-        Me.m_jointBar4.LargeChange = 50
-        Me.m_jointBar4.Value = 0
-
-        Me.m_jointLabel4.Text = "0.000"
-        Me.m_jointLabel4.Left = 292
-        Me.m_jointLabel4.Top = 116
-        Me.m_jointLabel4.Width = 58
-        Me.m_jointLabel4.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel4.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel4.BackColor = Color.Transparent
-        Me.m_jointLabel4.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName4)
-        Me.jointsHost.Controls.Add(Me.m_jointBar4)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel4)
-
-        ' 关节 6 (J6 腕旋)
-        Me.m_jointName5.Text = "J6 腕旋"
-        Me.m_jointName5.Left = 0
-        Me.m_jointName5.Top = 144
-        Me.m_jointName5.Width = 52
-        Me.m_jointName5.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointName5.BackColor = Color.Transparent
-        Me.m_jointName5.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_jointBar5.Left = 54
-        Me.m_jointBar5.Top = 140
-        Me.m_jointBar5.Width = 232
-        Me.m_jointBar5.Height = 26
-        Me.m_jointBar5.Minimum = -1000
-        Me.m_jointBar5.Maximum = 1000
-        Me.m_jointBar5.TickStyle = TickStyle.None
-        Me.m_jointBar5.SmallChange = 5
-        Me.m_jointBar5.LargeChange = 50
-        Me.m_jointBar5.Value = 0
-
-        Me.m_jointLabel5.Text = "0.000"
-        Me.m_jointLabel5.Left = 292
-        Me.m_jointLabel5.Top = 144
-        Me.m_jointLabel5.Width = 58
-        Me.m_jointLabel5.TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabel5.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabel5.BackColor = Color.Transparent
-        Me.m_jointLabel5.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.jointsHost.Controls.Add(Me.m_jointName5)
-        Me.jointsHost.Controls.Add(Me.m_jointBar5)
-        Me.jointsHost.Controls.Add(Me.m_jointLabel5)
-
-        ' TCP 位姿卡片
-        Me.tcpCard.Dock = DockStyle.None
-        Me.tcpCard.Width = 352
-        Me.tcpCard.Height = 86
-        Me.tcpCard.Margin = New Padding(0, 0, 0, 8)
-        Me.tcpCard.BackColor = Color.White
-        Me.tcpCard.Padding = New Padding(12, 10, 12, 10)
-
-        Me.tcpCardHeader.Text = "TCP 位姿"
-        Me.tcpCardHeader.Dock = DockStyle.Top
-        Me.tcpCardHeader.Height = 22
-        Me.tcpCardHeader.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.tcpCardHeader.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.tcpCardHeader.BackColor = Color.Transparent
-        Me.tcpCard.Controls.Add(Me.tcpCardHeader)
-
-        Me.m_lblTcp.Text = "x 0.000  y 0.000  z 0.000" & vbCrLf & "rx 0.0  ry 0.0  rz 0.0"
-        Me.m_lblTcp.Dock = DockStyle.Fill
-        Me.m_lblTcp.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_lblTcp.Font = New Font("Consolas", 9.0F, FontStyle.Regular)
-        Me.m_lblTcp.BackColor = Color.Transparent
-        Me.tcpCard.Controls.Add(Me.m_lblTcp)
-
-        ' 夹爪卡片
-        Me.gripCard.Dock = DockStyle.None
-        Me.gripCard.Width = 352
-        Me.gripCard.Height = 116
-        Me.gripCard.Margin = New Padding(0, 0, 0, 8)
-        Me.gripCard.BackColor = Color.White
-        Me.gripCard.Padding = New Padding(12, 10, 12, 10)
-
-        Me.gripCardHeader.Text = "夹爪"
-        Me.gripCardHeader.Dock = DockStyle.Top
-        Me.gripCardHeader.Height = 22
-        Me.gripCardHeader.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.gripCardHeader.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.gripCardHeader.BackColor = Color.Transparent
-        Me.gripCard.Controls.Add(Me.gripCardHeader)
-
-        Me.gripFlow.Dock = DockStyle.Fill
-        Me.gripFlow.FlowDirection = FlowDirection.LeftToRight
-        Me.gripFlow.WrapContents = True
-        Me.gripFlow.Padding = New Padding(0, 4, 0, 0)
-        Me.gripFlow.BackColor = Color.Transparent
-
-        Me.m_lblGripper.Text = "开口 0.036 m   夹持力 0 N"
-        Me.m_lblGripper.Width = 348
-        Me.m_lblGripper.Height = 22
-        Me.m_lblGripper.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_lblGripper.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-        Me.m_lblGripper.BackColor = Color.Transparent
-
-        ' m_btnRelease（描边按钮：AccentDim，76 宽）
-        Me.m_btnRelease.Text = "张开"
-        Me.m_btnRelease.Width = 76
-        Me.m_btnRelease.Height = 30
-        Me.m_btnRelease.FlatStyle = FlatStyle.Flat
-        Me.m_btnRelease.BackColor = Color.White
-        Me.m_btnRelease.ForeColor = Color.FromArgb(100, 116, 139)
-        Me.m_btnRelease.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnRelease.Cursor = Cursors.Hand
-        Me.m_btnRelease.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnRelease.TabStop = False
-        Me.m_btnRelease.FlatAppearance.BorderSize = 1
-        Me.m_btnRelease.FlatAppearance.BorderColor = Color.FromArgb(100, 116, 139)
-        Me.m_btnRelease.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnRelease.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        ' m_btnGrip（描边按钮：Accent，76 宽）
-        Me.m_btnGrip.Text = "夹紧"
-        Me.m_btnGrip.Width = 76
-        Me.m_btnGrip.Height = 30
-        Me.m_btnGrip.FlatStyle = FlatStyle.Flat
-        Me.m_btnGrip.BackColor = Color.White
-        Me.m_btnGrip.ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnGrip.Font = New Font("Microsoft YaHei UI", 9.0F, FontStyle.Regular)
-        Me.m_btnGrip.Cursor = Cursors.Hand
-        Me.m_btnGrip.Margin = New Padding(4, 0, 4, 0)
-        Me.m_btnGrip.TabStop = False
-        Me.m_btnGrip.FlatAppearance.BorderSize = 1
-        Me.m_btnGrip.FlatAppearance.BorderColor = Color.FromArgb(14, 165, 233)
-        Me.m_btnGrip.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 249, 255)
-        Me.m_btnGrip.FlatAppearance.MouseDownBackColor = Color.FromArgb(224, 242, 254)
-
-        Me.m_numGripForce.Minimum = 1D
-        Me.m_numGripForce.Maximum = 120D
-        Me.m_numGripForce.Value = 35D
-        Me.m_numGripForce.Increment = 5D
-        Me.m_numGripForce.Width = 66
-        Me.m_numGripForce.BackColor = Color.White
-        Me.m_numGripForce.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_numGripForce.BorderStyle = BorderStyle.FixedSingle
-        Me.m_numGripForce.Margin = New Padding(6, 2, 4, 0)
-
-        Me.forceLabel.Text = "N"
-        Me.forceLabel.AutoSize = True
-        Me.forceLabel.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.forceLabel.Margin = New Padding(0, 6, 0, 0)
-
-        Me.gripFlow.Controls.Add(Me.m_lblGripper)
-        Me.gripFlow.Controls.Add(Me.m_btnRelease)
-        Me.gripFlow.Controls.Add(Me.m_btnGrip)
-        Me.gripFlow.Controls.Add(Me.m_numGripForce)
-        Me.gripFlow.Controls.Add(Me.forceLabel)
-        Me.gripCard.Controls.Add(Me.gripFlow)
-
-        ' 夹爪相机卡片
-        Me.cameraCard.Dock = DockStyle.None
-        Me.cameraCard.Width = 352
-        Me.cameraCard.Height = 200
-        Me.cameraCard.Margin = New Padding(0, 0, 0, 8)
-        Me.cameraCard.BackColor = Color.White
-        Me.cameraCard.Padding = New Padding(12, 10, 12, 10)
-
-        Me.cameraCardHeader.Text = "夹爪相机 · 第一视角"
-        Me.cameraCardHeader.Dock = DockStyle.Top
-        Me.cameraCardHeader.Height = 22
-        Me.cameraCardHeader.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.cameraCardHeader.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.cameraCardHeader.BackColor = Color.Transparent
-        Me.cameraCard.Controls.Add(Me.cameraCardHeader)
-
-        Me.m_picCamera.Location = New Point(12, 32)
-        Me.m_picCamera.Size = New Size(328, 138)
-        Me.m_picCamera.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        Me.m_picCamera.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_picCamera.SizeMode = PictureBoxSizeMode.Zoom
-        Me.m_picCamera.BorderStyle = BorderStyle.FixedSingle
-        Me.m_picCamera.Margin = New Padding(0)
-        Me.cameraCard.Controls.Add(Me.m_picCamera)
-
-        Me.m_lblCamera.Text = "等待相机第一帧…"
-        Me.m_lblCamera.Location = New Point(12, 173)
-        Me.m_lblCamera.Size = New Size(328, 16)
-        Me.m_lblCamera.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
-        Me.m_lblCamera.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_lblCamera.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-        Me.m_lblCamera.BackColor = Color.Transparent
-        Me.m_lblCamera.TextAlign = ContentAlignment.MiddleLeft
-        Me.cameraCard.Controls.Add(Me.m_lblCamera)
-
-        ' 场景物体卡片
-        Me.objectCard.Dock = DockStyle.None
-        Me.objectCard.Width = 352
-        Me.objectCard.Height = 124
-        Me.objectCard.Margin = New Padding(0, 0, 0, 8)
-        Me.objectCard.BackColor = Color.White
-        Me.objectCard.Padding = New Padding(12, 10, 12, 10)
-
-        Me.objectCardHeader.Text = "场景物体"
-        Me.objectCardHeader.Dock = DockStyle.Top
-        Me.objectCardHeader.Height = 22
-        Me.objectCardHeader.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.objectCardHeader.Font = New Font("Microsoft YaHei UI", 10.0F, FontStyle.Bold)
-        Me.objectCardHeader.BackColor = Color.Transparent
-        Me.objectCard.Controls.Add(Me.objectCardHeader)
-
-        Me.m_lstObjects.Dock = DockStyle.Fill
-        Me.m_lstObjects.BackColor = Color.White
-        Me.m_lstObjects.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_lstObjects.BorderStyle = BorderStyle.None
-        Me.m_lstObjects.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-        Me.m_lstObjects.IntegralHeight = False
-        Me.objectCard.Controls.Add(Me.m_lstObjects)
-
-        ' FlowLayoutPanel 按添加顺序自上而下排列；相机放最前，保证一直可见
-        Me.m_side.Controls.Add(Me.cameraCard)
-        Me.m_side.Controls.Add(Me.jointCard)
-        Me.m_side.Controls.Add(Me.tcpCard)
-        Me.m_side.Controls.Add(Me.gripCard)
-        Me.m_side.Controls.Add(Me.objectCard)
-
-        ' ---------------- 底部日志 ----------------
-        Me.m_bottom.Dock = DockStyle.Bottom
-        Me.m_bottom.Height = 140
-        Me.m_bottom.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_bottom.Padding = New Padding(10, 6, 10, 6)
-
-        Me.m_log.Dock = DockStyle.Fill
-        Me.m_log.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_log.ForeColor = Color.FromArgb(30, 41, 59)
-        Me.m_log.BorderStyle = BorderStyle.None
-        Me.m_log.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-        Me.m_log.ReadOnly = True
-        Me.m_log.WordWrap = False
-        Me.m_log.ScrollBars = RichTextBoxScrollBars.Vertical
-        Me.m_log.DetectUrls = False
-        Me.m_bottom.Controls.Add(Me.m_log)
-
-        ' ---------------- 三维视口 ----------------
-        Me.m_viewport.Dock = DockStyle.Fill
-        Me.m_viewport.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_viewport.Padding = New Padding(0)
-
-        Me.m_canvas.Dock = DockStyle.Fill
-        Me.m_viewport.Controls.Add(Me.m_canvas)
-
-        ' ---------------- 状态栏 ----------------
-        Me.m_status.BackColor = Color.FromArgb(248, 250, 252)
-        Me.m_status.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_status.SizingGrip = False
-        Me.m_status.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
-
-        Me.m_statusLabel.Text = "就绪"
-        Me.m_statusLabel.Spring = True
-        Me.m_statusLabel.TextAlign = ContentAlignment.MiddleLeft
-
-        Me.m_lblStats.Text = "FPS 0 · 步/秒 0 · 三角面 0"
-        Me.m_lblStats.AutoSize = True
-        Me.m_lblStats.ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_lblStats.BackColor = Color.Transparent
-
-        Me.m_status.Items.Add(Me.m_statusLabel)
-
-        ' ---------------- 组装 ----------------
-        Me.Controls.Add(Me.m_viewport)
-        Me.Controls.Add(Me.m_side)
-        Me.Controls.Add(Me.m_bottom)
-        Me.Controls.Add(Me.m_top)
-        Me.Controls.Add(Me.m_status)
-
-        Me.m_timer.Interval = 16
-
-        Me.ResumeLayout(False)
-        Me.PerformLayout()
+        components = New ComponentModel.Container()
+        m_top = New Panel()
+        flow = New FlowLayoutPanel()
+        m_btnStart = New Button()
+        m_btnStopServer = New Button()
+        m_btnEnable = New Button()
+        m_btnHome = New Button()
+        m_btnHold = New Button()
+        m_btnEstop = New Button()
+        m_btnReset = New Button()
+        realtimeLabel = New Label()
+        m_numRealtime = New NumericUpDown()
+        brand = New Label()
+        m_lblService = New Label()
+        m_side = New FlowLayoutPanel()
+        cameraCard = New Panel()
+        cameraCardHeader = New Label()
+        m_picCamera = New PictureBox()
+        m_lblCamera = New Label()
+        jointCard = New Panel()
+        jointCardHeader = New Label()
+        jointsHost = New Panel()
+        m_jointName0 = New Label()
+        m_jointBar0 = New TrackBar()
+        m_jointLabel0 = New Label()
+        m_jointName1 = New Label()
+        m_jointBar1 = New TrackBar()
+        m_jointLabel1 = New Label()
+        m_jointName2 = New Label()
+        m_jointBar2 = New TrackBar()
+        m_jointLabel2 = New Label()
+        m_jointName3 = New Label()
+        m_jointBar3 = New TrackBar()
+        m_jointLabel3 = New Label()
+        m_jointName4 = New Label()
+        m_jointBar4 = New TrackBar()
+        m_jointLabel4 = New Label()
+        m_jointName5 = New Label()
+        m_jointBar5 = New TrackBar()
+        m_jointLabel5 = New Label()
+        tcpCard = New Panel()
+        tcpCardHeader = New Label()
+        m_lblTcp = New Label()
+        gripCard = New Panel()
+        gripCardHeader = New Label()
+        gripFlow = New FlowLayoutPanel()
+        m_lblGripper = New Label()
+        m_btnRelease = New Button()
+        m_btnGrip = New Button()
+        m_numGripForce = New NumericUpDown()
+        forceLabel = New Label()
+        objectCard = New Panel()
+        objectCardHeader = New Label()
+        m_lstObjects = New ListBox()
+        m_bottom = New Panel()
+        m_log = New RichTextBox()
+        m_viewport = New Panel()
+        m_canvas = New Drawing.DirectX.DxScene3DCanvas()
+        m_timer = New Timer(components)
+        m_status = New StatusStrip()
+        m_statusLabel = New ToolStripStatusLabel()
+        m_lblStats = New Label()
+        m_top.SuspendLayout()
+        flow.SuspendLayout()
+        CType(m_numRealtime, ComponentModel.ISupportInitialize).BeginInit()
+        m_side.SuspendLayout()
+        cameraCard.SuspendLayout()
+        CType(m_picCamera, ComponentModel.ISupportInitialize).BeginInit()
+        jointCard.SuspendLayout()
+        jointsHost.SuspendLayout()
+        CType(m_jointBar0, ComponentModel.ISupportInitialize).BeginInit()
+        CType(m_jointBar1, ComponentModel.ISupportInitialize).BeginInit()
+        CType(m_jointBar2, ComponentModel.ISupportInitialize).BeginInit()
+        CType(m_jointBar3, ComponentModel.ISupportInitialize).BeginInit()
+        CType(m_jointBar4, ComponentModel.ISupportInitialize).BeginInit()
+        CType(m_jointBar5, ComponentModel.ISupportInitialize).BeginInit()
+        tcpCard.SuspendLayout()
+        gripCard.SuspendLayout()
+        gripFlow.SuspendLayout()
+        CType(m_numGripForce, ComponentModel.ISupportInitialize).BeginInit()
+        objectCard.SuspendLayout()
+        m_bottom.SuspendLayout()
+        m_viewport.SuspendLayout()
+        m_status.SuspendLayout()
+        SuspendLayout()
+        ' 
+        ' m_top
+        ' 
+        m_top.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_top.Controls.Add(flow)
+        m_top.Controls.Add(brand)
+        m_top.Controls.Add(m_lblService)
+        m_top.Dock = DockStyle.Top
+        m_top.Location = New Point(0, 0)
+        m_top.Name = "m_top"
+        m_top.Padding = New Padding(12, 0, 12, 0)
+        m_top.Size = New Size(1440, 60)
+        m_top.TabIndex = 3
+        ' 
+        ' flow
+        ' 
+        flow.BackColor = Color.Transparent
+        flow.Controls.Add(m_btnStart)
+        flow.Controls.Add(m_btnStopServer)
+        flow.Controls.Add(m_btnEnable)
+        flow.Controls.Add(m_btnHome)
+        flow.Controls.Add(m_btnHold)
+        flow.Controls.Add(m_btnEstop)
+        flow.Controls.Add(m_btnReset)
+        flow.Controls.Add(realtimeLabel)
+        flow.Controls.Add(m_numRealtime)
+        flow.Dock = DockStyle.Left
+        flow.Location = New Point(202, 0)
+        flow.Name = "flow"
+        flow.Padding = New Padding(0, 14, 0, 0)
+        flow.Size = New Size(780, 60)
+        flow.TabIndex = 0
+        flow.WrapContents = False
+        ' 
+        ' m_btnStart
+        ' 
+        m_btnStart.BackColor = Color.FromArgb(CByte(37), CByte(99), CByte(235))
+        m_btnStart.Cursor = Cursors.Hand
+        m_btnStart.FlatAppearance.BorderSize = 0
+        m_btnStart.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(29), CByte(78), CByte(216))
+        m_btnStart.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(29), CByte(78), CByte(216))
+        m_btnStart.FlatStyle = FlatStyle.Flat
+        m_btnStart.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnStart.ForeColor = Color.White
+        m_btnStart.Location = New Point(4, 14)
+        m_btnStart.Margin = New Padding(4, 0, 4, 0)
+        m_btnStart.Name = "m_btnStart"
+        m_btnStart.Size = New Size(92, 32)
+        m_btnStart.TabIndex = 0
+        m_btnStart.TabStop = False
+        m_btnStart.Text = "启动服务"
+        m_btnStart.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnStopServer
+        ' 
+        m_btnStopServer.BackColor = Color.White
+        m_btnStopServer.Cursor = Cursors.Hand
+        m_btnStopServer.FlatAppearance.BorderColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnStopServer.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnStopServer.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnStopServer.FlatStyle = FlatStyle.Flat
+        m_btnStopServer.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnStopServer.ForeColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnStopServer.Location = New Point(104, 14)
+        m_btnStopServer.Margin = New Padding(4, 0, 4, 0)
+        m_btnStopServer.Name = "m_btnStopServer"
+        m_btnStopServer.Size = New Size(92, 30)
+        m_btnStopServer.TabIndex = 1
+        m_btnStopServer.TabStop = False
+        m_btnStopServer.Text = "停止服务"
+        m_btnStopServer.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnEnable
+        ' 
+        m_btnEnable.BackColor = Color.White
+        m_btnEnable.Cursor = Cursors.Hand
+        m_btnEnable.FlatAppearance.BorderColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnEnable.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnEnable.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnEnable.FlatStyle = FlatStyle.Flat
+        m_btnEnable.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnEnable.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnEnable.Location = New Point(204, 14)
+        m_btnEnable.Margin = New Padding(4, 0, 4, 0)
+        m_btnEnable.Name = "m_btnEnable"
+        m_btnEnable.Size = New Size(92, 30)
+        m_btnEnable.TabIndex = 2
+        m_btnEnable.TabStop = False
+        m_btnEnable.Text = "伺服使能"
+        m_btnEnable.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnHome
+        ' 
+        m_btnHome.BackColor = Color.White
+        m_btnHome.Cursor = Cursors.Hand
+        m_btnHome.FlatAppearance.BorderColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnHome.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnHome.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnHome.FlatStyle = FlatStyle.Flat
+        m_btnHome.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnHome.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnHome.Location = New Point(304, 14)
+        m_btnHome.Margin = New Padding(4, 0, 4, 0)
+        m_btnHome.Name = "m_btnHome"
+        m_btnHome.Size = New Size(92, 30)
+        m_btnHome.TabIndex = 3
+        m_btnHome.TabStop = False
+        m_btnHome.Text = "回零"
+        m_btnHome.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnHold
+        ' 
+        m_btnHold.BackColor = Color.White
+        m_btnHold.Cursor = Cursors.Hand
+        m_btnHold.FlatAppearance.BorderColor = Color.FromArgb(CByte(100), CByte(116), CByte(139))
+        m_btnHold.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnHold.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnHold.FlatStyle = FlatStyle.Flat
+        m_btnHold.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnHold.ForeColor = Color.FromArgb(CByte(100), CByte(116), CByte(139))
+        m_btnHold.Location = New Point(404, 14)
+        m_btnHold.Margin = New Padding(4, 0, 4, 0)
+        m_btnHold.Name = "m_btnHold"
+        m_btnHold.Size = New Size(92, 30)
+        m_btnHold.TabIndex = 4
+        m_btnHold.TabStop = False
+        m_btnHold.Text = "保持"
+        m_btnHold.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnEstop
+        ' 
+        m_btnEstop.BackColor = Color.White
+        m_btnEstop.Cursor = Cursors.Hand
+        m_btnEstop.FlatAppearance.BorderColor = Color.FromArgb(CByte(220), CByte(38), CByte(38))
+        m_btnEstop.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnEstop.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnEstop.FlatStyle = FlatStyle.Flat
+        m_btnEstop.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnEstop.ForeColor = Color.FromArgb(CByte(220), CByte(38), CByte(38))
+        m_btnEstop.Location = New Point(504, 14)
+        m_btnEstop.Margin = New Padding(4, 0, 4, 0)
+        m_btnEstop.Name = "m_btnEstop"
+        m_btnEstop.Size = New Size(72, 30)
+        m_btnEstop.TabIndex = 5
+        m_btnEstop.TabStop = False
+        m_btnEstop.Text = "急停"
+        m_btnEstop.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnReset
+        ' 
+        m_btnReset.BackColor = Color.White
+        m_btnReset.Cursor = Cursors.Hand
+        m_btnReset.FlatAppearance.BorderColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnReset.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnReset.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnReset.FlatStyle = FlatStyle.Flat
+        m_btnReset.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnReset.ForeColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnReset.Location = New Point(584, 14)
+        m_btnReset.Margin = New Padding(4, 0, 4, 0)
+        m_btnReset.Name = "m_btnReset"
+        m_btnReset.Size = New Size(92, 30)
+        m_btnReset.TabIndex = 6
+        m_btnReset.TabStop = False
+        m_btnReset.Text = "复位场景"
+        m_btnReset.UseVisualStyleBackColor = False
+        ' 
+        ' realtimeLabel
+        ' 
+        realtimeLabel.AutoSize = True
+        realtimeLabel.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        realtimeLabel.Location = New Point(692, 20)
+        realtimeLabel.Margin = New Padding(12, 6, 4, 0)
+        realtimeLabel.Name = "realtimeLabel"
+        realtimeLabel.Size = New Size(32, 17)
+        realtimeLabel.TabIndex = 7
+        realtimeLabel.Text = "倍率"
+        ' 
+        ' m_numRealtime
+        ' 
+        m_numRealtime.BackColor = Color.White
+        m_numRealtime.BorderStyle = BorderStyle.FixedSingle
+        m_numRealtime.DecimalPlaces = 1
+        m_numRealtime.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_numRealtime.Increment = New Decimal(New Integer() {5, 0, 0, 65536})
+        m_numRealtime.Location = New Point(728, 16)
+        m_numRealtime.Margin = New Padding(0, 2, 0, 0)
+        m_numRealtime.Maximum = New Decimal(New Integer() {20, 0, 0, 0})
+        m_numRealtime.Name = "m_numRealtime"
+        m_numRealtime.Size = New Size(62, 23)
+        m_numRealtime.TabIndex = 8
+        m_numRealtime.Value = New Decimal(New Integer() {1, 0, 0, 0})
+        ' 
+        ' brand
+        ' 
+        brand.BackColor = Color.Transparent
+        brand.Dock = DockStyle.Left
+        brand.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        brand.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        brand.Location = New Point(12, 0)
+        brand.Name = "brand"
+        brand.Size = New Size(190, 60)
+        brand.TabIndex = 1
+        brand.Text = "VIRTUAL WORKSHOP"
+        brand.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' m_lblService
+        ' 
+        m_lblService.BackColor = Color.Transparent
+        m_lblService.Dock = DockStyle.Right
+        m_lblService.Font = New Font("Consolas", 8F)
+        m_lblService.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_lblService.Location = New Point(1178, 0)
+        m_lblService.Name = "m_lblService"
+        m_lblService.Size = New Size(250, 60)
+        m_lblService.TabIndex = 2
+        m_lblService.Text = "离线"
+        m_lblService.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_side
+        ' 
+        m_side.AutoScroll = True
+        m_side.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_side.Controls.Add(cameraCard)
+        m_side.Controls.Add(jointCard)
+        m_side.Controls.Add(tcpCard)
+        m_side.Controls.Add(gripCard)
+        m_side.Controls.Add(objectCard)
+        m_side.Dock = DockStyle.Right
+        m_side.FlowDirection = FlowDirection.TopDown
+        m_side.Location = New Point(1054, 60)
+        m_side.Name = "m_side"
+        m_side.Padding = New Padding(8)
+        m_side.Size = New Size(386, 758)
+        m_side.TabIndex = 1
+        m_side.WrapContents = False
+        ' 
+        ' cameraCard
+        ' 
+        cameraCard.BackColor = Color.White
+        cameraCard.Controls.Add(cameraCardHeader)
+        cameraCard.Controls.Add(m_picCamera)
+        cameraCard.Controls.Add(m_lblCamera)
+        cameraCard.Location = New Point(8, 8)
+        cameraCard.Margin = New Padding(0, 0, 0, 8)
+        cameraCard.Name = "cameraCard"
+        cameraCard.Padding = New Padding(12, 10, 12, 10)
+        cameraCard.Size = New Size(352, 200)
+        cameraCard.TabIndex = 0
+        ' 
+        ' cameraCardHeader
+        ' 
+        cameraCardHeader.BackColor = Color.Transparent
+        cameraCardHeader.Dock = DockStyle.Top
+        cameraCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        cameraCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        cameraCardHeader.Location = New Point(12, 10)
+        cameraCardHeader.Name = "cameraCardHeader"
+        cameraCardHeader.Size = New Size(328, 22)
+        cameraCardHeader.TabIndex = 0
+        cameraCardHeader.Text = "夹爪相机 · 第一视角"
+        ' 
+        ' m_picCamera
+        ' 
+        m_picCamera.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        m_picCamera.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_picCamera.BorderStyle = BorderStyle.FixedSingle
+        m_picCamera.Location = New Point(12, 32)
+        m_picCamera.Margin = New Padding(0)
+        m_picCamera.Name = "m_picCamera"
+        m_picCamera.Size = New Size(328, 138)
+        m_picCamera.SizeMode = PictureBoxSizeMode.Zoom
+        m_picCamera.TabIndex = 1
+        m_picCamera.TabStop = False
+        ' 
+        ' m_lblCamera
+        ' 
+        m_lblCamera.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+        m_lblCamera.BackColor = Color.Transparent
+        m_lblCamera.Font = New Font("Consolas", 8F)
+        m_lblCamera.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_lblCamera.Location = New Point(12, 173)
+        m_lblCamera.Name = "m_lblCamera"
+        m_lblCamera.Size = New Size(328, 16)
+        m_lblCamera.TabIndex = 2
+        m_lblCamera.Text = "等待相机第一帧…"
+        m_lblCamera.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' jointCard
+        ' 
+        jointCard.BackColor = Color.White
+        jointCard.Controls.Add(jointCardHeader)
+        jointCard.Controls.Add(jointsHost)
+        jointCard.Location = New Point(8, 216)
+        jointCard.Margin = New Padding(0, 0, 0, 8)
+        jointCard.Name = "jointCard"
+        jointCard.Padding = New Padding(12, 10, 12, 10)
+        jointCard.Size = New Size(352, 200)
+        jointCard.TabIndex = 1
+        ' 
+        ' jointCardHeader
+        ' 
+        jointCardHeader.BackColor = Color.Transparent
+        jointCardHeader.Dock = DockStyle.Top
+        jointCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        jointCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        jointCardHeader.Location = New Point(12, 10)
+        jointCardHeader.Name = "jointCardHeader"
+        jointCardHeader.Size = New Size(328, 22)
+        jointCardHeader.TabIndex = 0
+        jointCardHeader.Text = "关节状态"
+        ' 
+        ' jointsHost
+        ' 
+        jointsHost.AutoScroll = True
+        jointsHost.BackColor = Color.Transparent
+        jointsHost.Controls.Add(m_jointName0)
+        jointsHost.Controls.Add(m_jointBar0)
+        jointsHost.Controls.Add(m_jointLabel0)
+        jointsHost.Controls.Add(m_jointName1)
+        jointsHost.Controls.Add(m_jointBar1)
+        jointsHost.Controls.Add(m_jointLabel1)
+        jointsHost.Controls.Add(m_jointName2)
+        jointsHost.Controls.Add(m_jointBar2)
+        jointsHost.Controls.Add(m_jointLabel2)
+        jointsHost.Controls.Add(m_jointName3)
+        jointsHost.Controls.Add(m_jointBar3)
+        jointsHost.Controls.Add(m_jointLabel3)
+        jointsHost.Controls.Add(m_jointName4)
+        jointsHost.Controls.Add(m_jointBar4)
+        jointsHost.Controls.Add(m_jointLabel4)
+        jointsHost.Controls.Add(m_jointName5)
+        jointsHost.Controls.Add(m_jointBar5)
+        jointsHost.Controls.Add(m_jointLabel5)
+        jointsHost.Dock = DockStyle.Fill
+        jointsHost.Location = New Point(12, 10)
+        jointsHost.Name = "jointsHost"
+        jointsHost.Padding = New Padding(0, 4, 0, 0)
+        jointsHost.Size = New Size(328, 180)
+        jointsHost.TabIndex = 1
+        ' 
+        ' m_jointName0
+        ' 
+        m_jointName0.BackColor = Color.Transparent
+        m_jointName0.Font = New Font("Consolas", 8F)
+        m_jointName0.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName0.Location = New Point(0, 4)
+        m_jointName0.Name = "m_jointName0"
+        m_jointName0.Size = New Size(52, 23)
+        m_jointName0.TabIndex = 0
+        m_jointName0.Text = "J1 腰"
+        ' 
+        ' m_jointBar0
+        ' 
+        m_jointBar0.LargeChange = 50
+        m_jointBar0.Location = New Point(54, 0)
+        m_jointBar0.Maximum = 1000
+        m_jointBar0.Minimum = -1000
+        m_jointBar0.Name = "m_jointBar0"
+        m_jointBar0.Size = New Size(232, 45)
+        m_jointBar0.SmallChange = 5
+        m_jointBar0.TabIndex = 1
+        m_jointBar0.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel0
+        ' 
+        m_jointLabel0.BackColor = Color.Transparent
+        m_jointLabel0.Font = New Font("Consolas", 8F)
+        m_jointLabel0.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel0.Location = New Point(292, 4)
+        m_jointLabel0.Name = "m_jointLabel0"
+        m_jointLabel0.Size = New Size(58, 23)
+        m_jointLabel0.TabIndex = 2
+        m_jointLabel0.Text = "0.000"
+        m_jointLabel0.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_jointName1
+        ' 
+        m_jointName1.BackColor = Color.Transparent
+        m_jointName1.Font = New Font("Consolas", 8F)
+        m_jointName1.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName1.Location = New Point(0, 32)
+        m_jointName1.Name = "m_jointName1"
+        m_jointName1.Size = New Size(52, 23)
+        m_jointName1.TabIndex = 3
+        m_jointName1.Text = "J2 肩"
+        ' 
+        ' m_jointBar1
+        ' 
+        m_jointBar1.LargeChange = 50
+        m_jointBar1.Location = New Point(54, 28)
+        m_jointBar1.Maximum = 1000
+        m_jointBar1.Minimum = -1000
+        m_jointBar1.Name = "m_jointBar1"
+        m_jointBar1.Size = New Size(232, 45)
+        m_jointBar1.SmallChange = 5
+        m_jointBar1.TabIndex = 4
+        m_jointBar1.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel1
+        ' 
+        m_jointLabel1.BackColor = Color.Transparent
+        m_jointLabel1.Font = New Font("Consolas", 8F)
+        m_jointLabel1.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel1.Location = New Point(292, 32)
+        m_jointLabel1.Name = "m_jointLabel1"
+        m_jointLabel1.Size = New Size(58, 23)
+        m_jointLabel1.TabIndex = 5
+        m_jointLabel1.Text = "0.000"
+        m_jointLabel1.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_jointName2
+        ' 
+        m_jointName2.BackColor = Color.Transparent
+        m_jointName2.Font = New Font("Consolas", 8F)
+        m_jointName2.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName2.Location = New Point(0, 60)
+        m_jointName2.Name = "m_jointName2"
+        m_jointName2.Size = New Size(52, 23)
+        m_jointName2.TabIndex = 6
+        m_jointName2.Text = "J3 肘"
+        ' 
+        ' m_jointBar2
+        ' 
+        m_jointBar2.LargeChange = 50
+        m_jointBar2.Location = New Point(54, 56)
+        m_jointBar2.Maximum = 1000
+        m_jointBar2.Minimum = -1000
+        m_jointBar2.Name = "m_jointBar2"
+        m_jointBar2.Size = New Size(232, 45)
+        m_jointBar2.SmallChange = 5
+        m_jointBar2.TabIndex = 7
+        m_jointBar2.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel2
+        ' 
+        m_jointLabel2.BackColor = Color.Transparent
+        m_jointLabel2.Font = New Font("Consolas", 8F)
+        m_jointLabel2.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel2.Location = New Point(292, 60)
+        m_jointLabel2.Name = "m_jointLabel2"
+        m_jointLabel2.Size = New Size(58, 23)
+        m_jointLabel2.TabIndex = 8
+        m_jointLabel2.Text = "0.000"
+        m_jointLabel2.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_jointName3
+        ' 
+        m_jointName3.BackColor = Color.Transparent
+        m_jointName3.Font = New Font("Consolas", 8F)
+        m_jointName3.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName3.Location = New Point(0, 88)
+        m_jointName3.Name = "m_jointName3"
+        m_jointName3.Size = New Size(52, 23)
+        m_jointName3.TabIndex = 9
+        m_jointName3.Text = "J4 腕转"
+        ' 
+        ' m_jointBar3
+        ' 
+        m_jointBar3.LargeChange = 50
+        m_jointBar3.Location = New Point(54, 84)
+        m_jointBar3.Maximum = 1000
+        m_jointBar3.Minimum = -1000
+        m_jointBar3.Name = "m_jointBar3"
+        m_jointBar3.Size = New Size(232, 45)
+        m_jointBar3.SmallChange = 5
+        m_jointBar3.TabIndex = 10
+        m_jointBar3.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel3
+        ' 
+        m_jointLabel3.BackColor = Color.Transparent
+        m_jointLabel3.Font = New Font("Consolas", 8F)
+        m_jointLabel3.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel3.Location = New Point(292, 88)
+        m_jointLabel3.Name = "m_jointLabel3"
+        m_jointLabel3.Size = New Size(58, 23)
+        m_jointLabel3.TabIndex = 11
+        m_jointLabel3.Text = "0.000"
+        m_jointLabel3.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_jointName4
+        ' 
+        m_jointName4.BackColor = Color.Transparent
+        m_jointName4.Font = New Font("Consolas", 8F)
+        m_jointName4.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName4.Location = New Point(0, 116)
+        m_jointName4.Name = "m_jointName4"
+        m_jointName4.Size = New Size(52, 23)
+        m_jointName4.TabIndex = 12
+        m_jointName4.Text = "J5 腕摆"
+        ' 
+        ' m_jointBar4
+        ' 
+        m_jointBar4.LargeChange = 50
+        m_jointBar4.Location = New Point(54, 112)
+        m_jointBar4.Maximum = 1000
+        m_jointBar4.Minimum = -1000
+        m_jointBar4.Name = "m_jointBar4"
+        m_jointBar4.Size = New Size(232, 45)
+        m_jointBar4.SmallChange = 5
+        m_jointBar4.TabIndex = 13
+        m_jointBar4.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel4
+        ' 
+        m_jointLabel4.BackColor = Color.Transparent
+        m_jointLabel4.Font = New Font("Consolas", 8F)
+        m_jointLabel4.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel4.Location = New Point(292, 116)
+        m_jointLabel4.Name = "m_jointLabel4"
+        m_jointLabel4.Size = New Size(58, 23)
+        m_jointLabel4.TabIndex = 14
+        m_jointLabel4.Text = "0.000"
+        m_jointLabel4.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' m_jointName5
+        ' 
+        m_jointName5.BackColor = Color.Transparent
+        m_jointName5.Font = New Font("Consolas", 8F)
+        m_jointName5.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_jointName5.Location = New Point(0, 144)
+        m_jointName5.Name = "m_jointName5"
+        m_jointName5.Size = New Size(52, 23)
+        m_jointName5.TabIndex = 15
+        m_jointName5.Text = "J6 腕旋"
+        ' 
+        ' m_jointBar5
+        ' 
+        m_jointBar5.LargeChange = 50
+        m_jointBar5.Location = New Point(54, 140)
+        m_jointBar5.Maximum = 1000
+        m_jointBar5.Minimum = -1000
+        m_jointBar5.Name = "m_jointBar5"
+        m_jointBar5.Size = New Size(232, 45)
+        m_jointBar5.SmallChange = 5
+        m_jointBar5.TabIndex = 16
+        m_jointBar5.TickStyle = TickStyle.None
+        ' 
+        ' m_jointLabel5
+        ' 
+        m_jointLabel5.BackColor = Color.Transparent
+        m_jointLabel5.Font = New Font("Consolas", 8F)
+        m_jointLabel5.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_jointLabel5.Location = New Point(292, 144)
+        m_jointLabel5.Name = "m_jointLabel5"
+        m_jointLabel5.Size = New Size(58, 23)
+        m_jointLabel5.TabIndex = 17
+        m_jointLabel5.Text = "0.000"
+        m_jointLabel5.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' tcpCard
+        ' 
+        tcpCard.BackColor = Color.White
+        tcpCard.Controls.Add(tcpCardHeader)
+        tcpCard.Controls.Add(m_lblTcp)
+        tcpCard.Location = New Point(8, 424)
+        tcpCard.Margin = New Padding(0, 0, 0, 8)
+        tcpCard.Name = "tcpCard"
+        tcpCard.Padding = New Padding(12, 10, 12, 10)
+        tcpCard.Size = New Size(352, 86)
+        tcpCard.TabIndex = 2
+        ' 
+        ' tcpCardHeader
+        ' 
+        tcpCardHeader.BackColor = Color.Transparent
+        tcpCardHeader.Dock = DockStyle.Top
+        tcpCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        tcpCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        tcpCardHeader.Location = New Point(12, 10)
+        tcpCardHeader.Name = "tcpCardHeader"
+        tcpCardHeader.Size = New Size(328, 22)
+        tcpCardHeader.TabIndex = 0
+        tcpCardHeader.Text = "TCP 位姿"
+        ' 
+        ' m_lblTcp
+        ' 
+        m_lblTcp.BackColor = Color.Transparent
+        m_lblTcp.Dock = DockStyle.Fill
+        m_lblTcp.Font = New Font("Consolas", 9F)
+        m_lblTcp.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_lblTcp.Location = New Point(12, 10)
+        m_lblTcp.Name = "m_lblTcp"
+        m_lblTcp.Size = New Size(328, 66)
+        m_lblTcp.TabIndex = 1
+        m_lblTcp.Text = "x 0.000  y 0.000  z 0.000" & vbCrLf & "rx 0.0  ry 0.0  rz 0.0"
+        ' 
+        ' gripCard
+        ' 
+        gripCard.BackColor = Color.White
+        gripCard.Controls.Add(gripCardHeader)
+        gripCard.Controls.Add(gripFlow)
+        gripCard.Location = New Point(8, 518)
+        gripCard.Margin = New Padding(0, 0, 0, 8)
+        gripCard.Name = "gripCard"
+        gripCard.Padding = New Padding(12, 10, 12, 10)
+        gripCard.Size = New Size(352, 116)
+        gripCard.TabIndex = 3
+        ' 
+        ' gripCardHeader
+        ' 
+        gripCardHeader.BackColor = Color.Transparent
+        gripCardHeader.Dock = DockStyle.Top
+        gripCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        gripCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        gripCardHeader.Location = New Point(12, 10)
+        gripCardHeader.Name = "gripCardHeader"
+        gripCardHeader.Size = New Size(328, 22)
+        gripCardHeader.TabIndex = 0
+        gripCardHeader.Text = "夹爪"
+        ' 
+        ' gripFlow
+        ' 
+        gripFlow.BackColor = Color.Transparent
+        gripFlow.Controls.Add(m_lblGripper)
+        gripFlow.Controls.Add(m_btnRelease)
+        gripFlow.Controls.Add(m_btnGrip)
+        gripFlow.Controls.Add(m_numGripForce)
+        gripFlow.Controls.Add(forceLabel)
+        gripFlow.Dock = DockStyle.Fill
+        gripFlow.Location = New Point(12, 10)
+        gripFlow.Name = "gripFlow"
+        gripFlow.Padding = New Padding(0, 4, 0, 0)
+        gripFlow.Size = New Size(328, 96)
+        gripFlow.TabIndex = 1
+        ' 
+        ' m_lblGripper
+        ' 
+        m_lblGripper.BackColor = Color.Transparent
+        m_lblGripper.Font = New Font("Consolas", 8F)
+        m_lblGripper.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_lblGripper.Location = New Point(3, 4)
+        m_lblGripper.Name = "m_lblGripper"
+        m_lblGripper.Size = New Size(348, 22)
+        m_lblGripper.TabIndex = 0
+        m_lblGripper.Text = "开口 0.036 m   夹持力 0 N"
+        ' 
+        ' m_btnRelease
+        ' 
+        m_btnRelease.BackColor = Color.White
+        m_btnRelease.Cursor = Cursors.Hand
+        m_btnRelease.FlatAppearance.BorderColor = Color.FromArgb(CByte(100), CByte(116), CByte(139))
+        m_btnRelease.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnRelease.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnRelease.FlatStyle = FlatStyle.Flat
+        m_btnRelease.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnRelease.ForeColor = Color.FromArgb(CByte(100), CByte(116), CByte(139))
+        m_btnRelease.Location = New Point(4, 26)
+        m_btnRelease.Margin = New Padding(4, 0, 4, 0)
+        m_btnRelease.Name = "m_btnRelease"
+        m_btnRelease.Size = New Size(76, 30)
+        m_btnRelease.TabIndex = 1
+        m_btnRelease.TabStop = False
+        m_btnRelease.Text = "张开"
+        m_btnRelease.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnGrip
+        ' 
+        m_btnGrip.BackColor = Color.White
+        m_btnGrip.Cursor = Cursors.Hand
+        m_btnGrip.FlatAppearance.BorderColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnGrip.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnGrip.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnGrip.FlatStyle = FlatStyle.Flat
+        m_btnGrip.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnGrip.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
+        m_btnGrip.Location = New Point(88, 26)
+        m_btnGrip.Margin = New Padding(4, 0, 4, 0)
+        m_btnGrip.Name = "m_btnGrip"
+        m_btnGrip.Size = New Size(76, 30)
+        m_btnGrip.TabIndex = 2
+        m_btnGrip.TabStop = False
+        m_btnGrip.Text = "夹紧"
+        m_btnGrip.UseVisualStyleBackColor = False
+        ' 
+        ' m_numGripForce
+        ' 
+        m_numGripForce.BackColor = Color.White
+        m_numGripForce.BorderStyle = BorderStyle.FixedSingle
+        m_numGripForce.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_numGripForce.Increment = New Decimal(New Integer() {5, 0, 0, 0})
+        m_numGripForce.Location = New Point(174, 28)
+        m_numGripForce.Margin = New Padding(6, 2, 4, 0)
+        m_numGripForce.Maximum = New Decimal(New Integer() {120, 0, 0, 0})
+        m_numGripForce.Minimum = New Decimal(New Integer() {1, 0, 0, 0})
+        m_numGripForce.Name = "m_numGripForce"
+        m_numGripForce.Size = New Size(66, 23)
+        m_numGripForce.TabIndex = 3
+        m_numGripForce.Value = New Decimal(New Integer() {35, 0, 0, 0})
+        ' 
+        ' forceLabel
+        ' 
+        forceLabel.AutoSize = True
+        forceLabel.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        forceLabel.Location = New Point(244, 32)
+        forceLabel.Margin = New Padding(0, 6, 0, 0)
+        forceLabel.Name = "forceLabel"
+        forceLabel.Size = New Size(18, 17)
+        forceLabel.TabIndex = 4
+        forceLabel.Text = "N"
+        ' 
+        ' objectCard
+        ' 
+        objectCard.BackColor = Color.White
+        objectCard.Controls.Add(objectCardHeader)
+        objectCard.Controls.Add(m_lstObjects)
+        objectCard.Location = New Point(8, 642)
+        objectCard.Margin = New Padding(0, 0, 0, 8)
+        objectCard.Name = "objectCard"
+        objectCard.Padding = New Padding(12, 10, 12, 10)
+        objectCard.Size = New Size(352, 124)
+        objectCard.TabIndex = 4
+        ' 
+        ' objectCardHeader
+        ' 
+        objectCardHeader.BackColor = Color.Transparent
+        objectCardHeader.Dock = DockStyle.Top
+        objectCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        objectCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        objectCardHeader.Location = New Point(12, 10)
+        objectCardHeader.Name = "objectCardHeader"
+        objectCardHeader.Size = New Size(328, 22)
+        objectCardHeader.TabIndex = 0
+        objectCardHeader.Text = "场景物体"
+        ' 
+        ' m_lstObjects
+        ' 
+        m_lstObjects.BackColor = Color.White
+        m_lstObjects.BorderStyle = BorderStyle.None
+        m_lstObjects.Dock = DockStyle.Fill
+        m_lstObjects.Font = New Font("Consolas", 8F)
+        m_lstObjects.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_lstObjects.IntegralHeight = False
+        m_lstObjects.Location = New Point(12, 10)
+        m_lstObjects.Name = "m_lstObjects"
+        m_lstObjects.Size = New Size(328, 104)
+        m_lstObjects.TabIndex = 1
+        ' 
+        ' m_bottom
+        ' 
+        m_bottom.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_bottom.Controls.Add(m_log)
+        m_bottom.Dock = DockStyle.Bottom
+        m_bottom.Location = New Point(0, 818)
+        m_bottom.Name = "m_bottom"
+        m_bottom.Padding = New Padding(10, 6, 10, 6)
+        m_bottom.Size = New Size(1440, 140)
+        m_bottom.TabIndex = 2
+        ' 
+        ' m_log
+        ' 
+        m_log.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_log.BorderStyle = BorderStyle.None
+        m_log.DetectUrls = False
+        m_log.Dock = DockStyle.Fill
+        m_log.Font = New Font("Consolas", 8F)
+        m_log.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_log.Location = New Point(10, 6)
+        m_log.Name = "m_log"
+        m_log.ReadOnly = True
+        m_log.ScrollBars = RichTextBoxScrollBars.Vertical
+        m_log.Size = New Size(1420, 128)
+        m_log.TabIndex = 0
+        m_log.Text = ""
+        m_log.WordWrap = False
+        ' 
+        ' m_viewport
+        ' 
+        m_viewport.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_viewport.Controls.Add(m_canvas)
+        m_viewport.Dock = DockStyle.Fill
+        m_viewport.Location = New Point(0, 60)
+        m_viewport.Name = "m_viewport"
+        m_viewport.Size = New Size(1054, 758)
+        m_viewport.TabIndex = 0
+        ' 
+        ' m_canvas
+        ' 
+        m_canvas.AutoClear = False
+        m_canvas.BackColor = Color.LightSkyBlue
+        m_canvas.ColorScheme = Imaging.Drawing2D.Colors.ScalerPalette.viridis
+        m_canvas.Dock = DockStyle.Fill
+        m_canvas.Location = New Point(0, 0)
+        m_canvas.Name = "m_canvas"
+        m_canvas.Size = New Size(1054, 758)
+        m_canvas.TabIndex = 0
+        ' 
+        ' m_timer
+        ' 
+        m_timer.Interval = 16
+        ' 
+        ' m_status
+        ' 
+        m_status.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
+        m_status.Font = New Font("Consolas", 8F)
+        m_status.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_status.Items.AddRange(New ToolStripItem() {m_statusLabel})
+        m_status.Location = New Point(0, 958)
+        m_status.Name = "m_status"
+        m_status.Size = New Size(1440, 22)
+        m_status.SizingGrip = False
+        m_status.TabIndex = 4
+        ' 
+        ' m_statusLabel
+        ' 
+        m_statusLabel.Name = "m_statusLabel"
+        m_statusLabel.Size = New Size(1425, 17)
+        m_statusLabel.Spring = True
+        m_statusLabel.Text = "就绪"
+        m_statusLabel.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' m_lblStats
+        ' 
+        m_lblStats.AutoSize = True
+        m_lblStats.BackColor = Color.Transparent
+        m_lblStats.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        m_lblStats.Location = New Point(0, 0)
+        m_lblStats.Name = "m_lblStats"
+        m_lblStats.Size = New Size(100, 23)
+        m_lblStats.TabIndex = 0
+        m_lblStats.Text = "FPS 0 · 步/秒 0 · 三角面 0"
+        ' 
+        ' FormVirtualLab
+        ' 
+        AutoScaleDimensions = New SizeF(7F, 17F)
+        AutoScaleMode = AutoScaleMode.Font
+        BackColor = Color.White
+        ClientSize = New Size(1440, 980)
+        Controls.Add(m_viewport)
+        Controls.Add(m_side)
+        Controls.Add(m_bottom)
+        Controls.Add(m_top)
+        Controls.Add(m_status)
+        DoubleBuffered = True
+        Font = New Font("Microsoft YaHei UI", 9F)
+        ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        MinimumSize = New Size(1180, 780)
+        Name = "FormVirtualLab"
+        Text = "VirtualWorkshop · 六轴机械臂虚拟硬件仿真工作台"
+        m_top.ResumeLayout(False)
+        flow.ResumeLayout(False)
+        flow.PerformLayout()
+        CType(m_numRealtime, ComponentModel.ISupportInitialize).EndInit()
+        m_side.ResumeLayout(False)
+        cameraCard.ResumeLayout(False)
+        CType(m_picCamera, ComponentModel.ISupportInitialize).EndInit()
+        jointCard.ResumeLayout(False)
+        jointsHost.ResumeLayout(False)
+        jointsHost.PerformLayout()
+        CType(m_jointBar0, ComponentModel.ISupportInitialize).EndInit()
+        CType(m_jointBar1, ComponentModel.ISupportInitialize).EndInit()
+        CType(m_jointBar2, ComponentModel.ISupportInitialize).EndInit()
+        CType(m_jointBar3, ComponentModel.ISupportInitialize).EndInit()
+        CType(m_jointBar4, ComponentModel.ISupportInitialize).EndInit()
+        CType(m_jointBar5, ComponentModel.ISupportInitialize).EndInit()
+        tcpCard.ResumeLayout(False)
+        gripCard.ResumeLayout(False)
+        gripFlow.ResumeLayout(False)
+        gripFlow.PerformLayout()
+        CType(m_numGripForce, ComponentModel.ISupportInitialize).EndInit()
+        objectCard.ResumeLayout(False)
+        m_bottom.ResumeLayout(False)
+        m_viewport.ResumeLayout(False)
+        m_status.ResumeLayout(False)
+        m_status.PerformLayout()
+        ResumeLayout(False)
+        PerformLayout()
     End Sub
 
 End Class
