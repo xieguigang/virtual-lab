@@ -43,10 +43,10 @@ var DOWN_RZ = 0;
 // 不要摆得更远（x/y 再大 0.1 m 以上）：那种位置 IK 解不出"末端朝下"的姿态，
 // 会回退成只约束位置，抬臂时姿态突变，夹着的方块被甩到 1.7 m 外。
 var PICK_SPOTS = [
-    { x: 0.20, y: 0.20 },
-    { x: 0.26, y: 0.16 },
-    { x: 0.16, y: 0.24 },
-    { x: 0.28, y: 0.10 }
+    { x: 0.24, y: 0.12 },
+    { x: 0.28, y: 0.10 },
+    { x: 0.20, y: 0.16 },
+    { x: 0.26, y: 0.14 }
 ];
 
 var BALANCED_DEG = 3.0;         // 倾角阈值
@@ -122,12 +122,22 @@ function moveStraight(x, y, z, speed) {
         return;
     }
 
-    var motion = arm.moveLHold(x, y, z, speed);
-    var done = arm.waitMotion(motion.motionId, 180000);
+    try {
+        var motion = arm.moveLHold(x, y, z, speed);
+        var done = arm.waitMotion(motion.motionId, 180000);
 
-    if (!done.done || !done.success) {
-        throw new Error('直线运动未完成: ' + done.message);
+        if (!done.done || !done.success) {
+            throw new Error(done.message);
+        }
+
+        return;
+    } catch (err) {
+        // 手腕在侧向位置无法同时满足"朝下 + 偏航 0"，严格姿态会解不出来；
+        // 这时退回关节插值保证流程能走完（姿态会略变，但不会中断演示）
+        console.log('   · 严格姿态直线不可达，退回关节插值');
     }
+
+    movePose(x, y, z, speed);
 }
 
 // 空手接近/下降：关节插值更灵活（低处姿态要求苛刻时也能到达）
@@ -164,7 +174,7 @@ function pick(px, py, pz) {
     var gs = arm.state().gripper;
     console.log('     夹持: contact=' + gs.contact + '  open=' + gs.opening.toFixed(3) + '  hold=' + gs.holdingId);
 
-    ascendSlowly(px, py, pz + FINGER_DROP, 0.40, 6);
+    ascendSlowly(px, py, pz + FINGER_DROP, 0.40, 10);
 }
 
 function place(qx, qy) {

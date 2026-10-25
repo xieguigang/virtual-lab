@@ -1,4 +1,4 @@
-Imports Microsoft.VisualBasic.Engine.Physics
+﻿Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
 Imports VirtualWorkshop.Protocol
@@ -325,7 +325,7 @@ Namespace Simulation
         Private Function SolveStrictOrientation(goal As Pose3D, seed As Double()) As IkResult
             Dim attempt As IkResult = Kinematics.Solve(
                 Simulation.Assembly, goal, seed,
-                positionOnly:=False, maxIterations:=120, tolerance:=0.0005)
+                positionOnly:=False, maxIterations:=160, tolerance:=0.004)
 
             If attempt.Success Then Return attempt
 
@@ -342,7 +342,7 @@ Namespace Simulation
 
                 attempt = Kinematics.Solve(
                     Simulation.Assembly, goal, q,
-                    positionOnly:=False, maxIterations:=120, tolerance:=0.0005)
+                    positionOnly:=False, maxIterations:=160, tolerance:=0.004)
 
                 If attempt.Success Then Return attempt
             Next
