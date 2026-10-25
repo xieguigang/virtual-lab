@@ -200,6 +200,35 @@ Public Class ArmJsHost
         Return ToDictionary(_client.Invoke("spawn", args))
     End Function
 
+    ''' <summary>
+    ''' 生成一个**静态**道具（桌子、桌腿等）：不会被推动、也不受重力。
+    ''' </summary>
+    ''' <remarks>
+    ''' 单独开一个方法而不是给 <see cref="spawn"/> 加可选参数：
+    ''' LiteJs 通过反射调用 CLR 方法，可选参数不一定能正确填默认值，
+    ''' 给已有方法加参数有把现有脚本（pick_and_place 等）调崩的风险。
+    ''' </remarks>
+    Public Function spawnStatic(shape As String, size As Double(), position As Double(),
+                                Optional mass As Double = 50.0,
+                                Optional friction As Double = 0.8,
+                                Optional color As String = Nothing) As Dictionary(Of String, Object)
+
+        Dim args As New JsonObject From {
+            {"shape", shape},
+            {"size", ToArray(size)},
+            {"position", ToArray(position)},
+            {"mass", mass},
+            {"friction", friction},
+            {"static", True}
+        }
+
+        If Not String.IsNullOrEmpty(color) Then
+            args("color") = color
+        End If
+
+        Return ToDictionary(_client.Invoke("spawn", args))
+    End Function
+
     Public Function objects() As List(Of Object)
         Dim result As Dictionary(Of String, Object) = ToDictionary(_client.Invoke("objects", New JsonObject()))
         Dim items As Object = Nothing

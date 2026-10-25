@@ -393,6 +393,27 @@ Namespace Diagnostics
                 Call Check(vivid.Count >= 3, $"俯视时能看到彩色积木（{vivid.Count} 种饱和色）")
             End If
 
+            ' ---- 平台必须进相机缓冲 ----
+            ' balance_beam 曾经出现"视口能看到弹簧木板、相机画面里却没有"：
+            ' 视口走 SceneBuilder.AppendPlatform，相机走 SceneTriangleBuffer，
+            ' 后者漏了平台。这里用"加平台后三角面数量必须变多"来守住这条链路。
+            Dim baselineBuffer As New SceneTriangleBuffer()
+
+            Call baselineBuffer.Build(simulation)
+            Dim baseline As Integer = baselineBuffer.Count
+
+            Call simulation.CreatePlatform(New Vector3(0.30, 0.30, 0.03), New Vector3(0.36, 0.0, 0.10),
+                                          0.6, 0.6, 200.0, 60.0, 0.085, 4)
+
+            Dim platformBuffer As New SceneTriangleBuffer()
+
+            Call platformBuffer.Build(simulation)
+
+            Call Check(platformBuffer.Count > baseline + 10,
+                       $"相机缓冲包含弹簧木板（{baseline} → {platformBuffer.Count} 三角面）")
+
+            Call simulation.RemovePlatform()
+
             Call Check(Not camera.Faulted, "相机无异常" & If(camera.LastError Is Nothing, "", "：" & camera.LastError))
         End Sub
 

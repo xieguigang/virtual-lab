@@ -68,12 +68,73 @@ Namespace Sensing
                 Call Append(simulation.FingerMeshes(i), body.Position, body.Orientation, Vector3.Zero)
             Next
 
-            ' 积木（顶点已相对质心）
+            ' 积木 / 静态道具（顶点已相对质心）
             For Each item As BlockInstance In simulation.Objects
                 If item.Render Is Nothing Then Continue For
 
                 Call Append(item.Render, item.Body.Position, item.Body.Orientation, Vector3.Zero)
             Next
+
+            ' 平台与地面不是 Objects 里的物体，必须在这里单独补上。
+            ' 之前漏了这一段，导致"视口能看到弹簧木板、相机画面里却没有"（balance_beam 的相机 bug）。
+            ' 以后新增任何"直接 world.Add 的刚体"，都要同时改这里与 Rendering.SceneBuilder。
+            Call AppendPlatform(simulation)
+            Call AppendGround(simulation)
+        End Sub
+
+        ''' <summary>弹簧木板平台（木板 + 行程限位挡块）。</summary>
+        Private Sub AppendPlatform(simulation As ArmSimulation)
+            Dim platform As SpringPlatform = simulation.Platform
+
+            If platform Is Nothing Then Return
+
+            If platform.PlateMesh IsNot Nothing AndAlso platform.Plate IsNot Nothing Then
+                Call Append(platform.PlateMesh, platform.Plate.Position, platform.Plate.Orientation, Vector3.Zero)
+            End If
+
+            If platform.StopperMesh IsNot Nothing AndAlso platform.Stopper IsNot Nothing Then
+                Call Append(platform.StopperMesh, platform.Stopper.Position, platform.Stopper.Orientation, Vector3.Zero)
+            End If
+        End Sub
+
+        ''' <summary>
+        ''' 地面（以世界原点为中心的一大块四边形）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 不画地面时，俯视画面里所有物体都像悬在背景色里，很难判断"桌子/瓶子到底在哪"。
+        ''' 只加两个三角形，填充成本与原来的背景清除相当。
+        ''' </remarks>
+        Private Sub AppendGround(simulation As ArmSimulation)
+            Const half As Double = 1.2
+
+            Dim z As Double = simulation.GroundZ
+            Dim color As Integer = ColorOf("#E2E8F0")
+
+            Call EnsureCapacity(Count + 2)
+
+            Dim vertices As Single() = Me.Vertices
+            Dim colors As Integer() = Me.Colors
+            Dim offset As Integer = Count * 9
+
+            ' 两个三角形拼成一个正方形（逆时针，双面渲染所以顺序不敏感）
+            Call WritePoint(vertices, offset, New Vector3(-half, -half, z))
+            Call WritePoint(vertices, offset + 3, New Vector3(half, -half, z))
+            Call WritePoint(vertices, offset + 6, New Vector3(half, half, z))
+
+            Call WritePoint(vertices, offset + 9, New Vector3(-half, -half, z))
+            Call WritePoint(vertices, offset + 12, New Vector3(half, half, z))
+            Call WritePoint(vertices, offset + 15, New Vector3(-half, half, z))
+
+            colors(Count) = color
+            colors(Count + 1) = color
+
+            Count += 2
+        End Sub
+
+        Private Shared Sub WritePoint(target As Single(), offset As Integer, point As Vector3)
+            target(offset) = CSng(point.x)
+            target(offset + 1) = CSng(point.y)
+            target(offset + 2) = CSng(point.z)
         End Sub
 
         ''' <summary>按 OwnerLink 分组网格（只做一次）。</summary>

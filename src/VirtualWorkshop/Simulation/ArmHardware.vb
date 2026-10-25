@@ -621,8 +621,9 @@ Namespace Simulation
                               Optional rotation As Quaternion? = Nothing,
                               Optional mass As Double = 0.2,
                               Optional friction As Double = 0.75,
-                              Optional color As String = Nothing) As BlockInstance
-            Dim instance As BlockInstance = Simulation.SpawnBlock(shape, size, position, rotation, mass, friction, color)
+                              Optional color As String = Nothing,
+                              Optional isStatic As Boolean = False) As BlockInstance
+            Dim instance As BlockInstance = Simulation.SpawnBlock(shape, size, position, rotation, mass, friction, color, isStatic)
 
             Me.State = Simulation.CaptureState()
 

@@ -1,4 +1,4 @@
-Imports Microsoft.VisualBasic.Engine.Physics
+﻿Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
@@ -17,6 +17,8 @@ Namespace Simulation
         Pyramid = 7
         Disc = 8
         Wedge = 9
+        ''' <summary>三角瓶（Erlenmeyer）：几何来自 models\erlenmeyer_flask.glb。</summary>
+        Flask = 10
     End Enum
 
     ''' <summary>积木规格：形状 + 尺寸 + 质量 + 摩擦 + 颜色。</summary>
@@ -54,6 +56,12 @@ Namespace Simulation
         ''' <summary>局部包围盒尺寸。</summary>
         Public Property Size As Vector3
 
+        ''' <summary>是否是静态道具（桌子等）：静态体不会被推动，也不参与重力。</summary>
+        Public Property IsStatic As Boolean
+
+        ''' <summary>生成时的位置（质心），用于计算"被推移了多远"。</summary>
+        Public Property SpawnPosition As Vector3 = Vector3.Zero
+
     End Class
 
     ''' <summary>
@@ -87,6 +95,7 @@ Namespace Simulation
                 Case "pyramid", "棱锥" : Return BlockShape.Pyramid
                 Case "disc", "disk", "圆盘" : Return BlockShape.Disc
                 Case "wedge", "ramp", "斜坡", "斜面" : Return BlockShape.Wedge
+                Case "flask", "erlenmeyer", "三角瓶", "锥形瓶", "瓶" : Return BlockShape.Flask
                 Case Else : Return BlockShape.Box
             End Select
         End Function
@@ -102,6 +111,7 @@ Namespace Simulation
                 Case BlockShape.Pyramid : Return "pyramid"
                 Case BlockShape.Disc : Return "disc"
                 Case BlockShape.Wedge : Return "wedge"
+                Case BlockShape.Flask : Return "flask"
                 Case Else : Return "box"
             End Select
         End Function
@@ -131,6 +141,10 @@ Namespace Simulation
             Dim dims As Double() = NormalizeSize(spec)
             Dim mesh As ConvexMesh3D
             Dim collider As Collider3D
+
+            ' flask 用 glb 原始网格渲染，其他形状从凸包现生成
+            Dim renderMesh As LinkMesh = Nothing
+            Dim bodyPosition As Vector3 = position
 
             Select Case spec.Shape
                 Case BlockShape.Sphere
@@ -182,6 +196,23 @@ Namespace Simulation
                     mesh = ConvexMesh3D.CreateWedge(dims(0), dims(1), dims(2))
                     collider = New ConvexPolyhedronCollider3D(mesh)
 
+                Case BlockShape.Flask
+                    Dim geometry As FlaskGeometry = FlaskAssets.Geometry()
+
+                    If geometry IsNot Nothing Then
+                        mesh = geometry.Collider
+                        collider = New ConvexPolyhedronCollider3D(mesh)
+                        renderMesh = FlaskAssets.Tinted(geometry, spec.Color)
+
+                        ' flask 的 position 语义是"瓶底中心"，质心要沿瓶轴抬高
+                        bodyPosition = position + rotation.Rotate(geometry.PivotOffset)
+                    Else
+                        ' 兜底：模型缺失时用程序化锥台，保证脚本仍能跑
+                        mesh = ConvexPrimitives3D.CreateFrustum(0.04, 0.012, FlaskAssets.TargetHeight, 18)
+                        collider = New ConvexPolyhedronCollider3D(mesh)
+                        bodyPosition = position + New Vector3(0, 0, FlaskAssets.TargetHeight * 0.5)
+                    End If
+
                 Case Else
                     mesh = ConvexMesh3D.CreateBox(dims(0), dims(1), dims(2))
                     collider = New BoxCollider3D(dims(0), dims(1), dims(2))
@@ -189,7 +220,7 @@ Namespace Simulation
 
             Dim material As New PhysicsMaterial(spec.Friction, 0.05)
             Dim body As New RigidBody3D(collider, System.Math.Max(0.01, spec.Mass), material) With {
-                .Position = position,
+                .Position = bodyPosition,
                 .Orientation = rotation.Normalize(),
                 .Label = id,
                 .CollisionGroup = GroupEnvironment,
@@ -209,7 +240,7 @@ Namespace Simulation
                 .Spec = spec,
                 .Body = body,
                 .Mesh = mesh,
-                .Render = MeshTessellator.ToLinkMesh(mesh, spec.Color, id),
+                .Render = If(renderMesh IsNot Nothing, renderMesh, MeshTessellator.ToLinkMesh(mesh, spec.Color, id)),
                 .Size = size
             }
         End Function

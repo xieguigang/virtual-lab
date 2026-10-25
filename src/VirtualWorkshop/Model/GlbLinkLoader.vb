@@ -123,6 +123,34 @@ Namespace Model
         End Function
 
         ''' <summary>
+        ''' 加载单个道具模型（不依赖 URDF），把所有节点网格合并成一个 <see cref="LinkMesh"/>。
+        ''' </summary>
+        ''' <remarks>
+        ''' 三角瓶这类道具的 glb 里没有 URDF link 概念，所以传 <c>robot = Nothing</c>：
+        ''' <see cref="ResolveLinkName"/> 对任何节点都返回 Nothing，节点按自身名字分组。
+        ''' 这里再把各分组拼回一个网格；顶点保持 glb 的世界坐标（已做 Y-up→Z-up）。
+        ''' </remarks>
+        Public Function LoadProp(file As String) As LinkMesh
+            Dim scene As GlbScene = Load(file, Nothing, validateWithLandscape:=False)
+            Dim name As String = IO.Path.GetFileNameWithoutExtension(file)
+            Dim merged As New LinkMesh With {
+                .LinkName = name,
+                .OwnerLink = name,
+                .NodePath = file
+            }
+
+            For Each mesh As LinkMesh In scene.Meshes.Values
+                For Each triangle As MeshTriangle In mesh.Triangles
+                    merged.Triangles.Add(triangle)
+                Next
+            Next
+
+            Call merged.RecalculateBounds()
+
+            Return merged
+        End Function
+
+        ''' <summary>
         ''' 用 Landscape 的整体加载器再读一次，返回它认为的三角形数。
         ''' 这一步保证"模型确实是通过 Landscape 加载的"，同时校验按连杆分组的解析没有丢面。
         ''' </summary>

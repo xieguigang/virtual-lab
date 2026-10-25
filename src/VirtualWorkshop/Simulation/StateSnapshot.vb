@@ -1,4 +1,4 @@
-Imports Microsoft.VisualBasic.Engine.Physics
+﻿Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 
 Namespace Simulation
@@ -80,6 +80,21 @@ Namespace Simulation
         Public Property Size As Double()
         Public Property Mass As Double
         Public Property Color As String
+
+        ''' <summary>是否是静态道具（桌子等）。</summary>
+        Public Property IsStatic As Boolean
+
+        ''' <summary>姿态：upright / tilted / fall_over。</summary>
+        Public Property Posture As String
+
+        ''' <summary>相对世界竖直方向的倾角（度）。</summary>
+        Public Property TiltDeg As Double
+
+        ''' <summary>相对出生位置的水平位移（米）。</summary>
+        Public Property Displacement As Double
+
+        ''' <summary>是否已经掉下桌面（质心显著低于出生高度）。</summary>
+        Public Property Fallen As Boolean
 
     End Class
 

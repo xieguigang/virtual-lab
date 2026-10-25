@@ -764,7 +764,9 @@ Namespace Simulation
 
                 ' 只留 1 mm 余量：余量给大了会"过早"判定接触，挤压量被清零，
                 ' 手指只是轻轻贴住物体、夹持力不足，一抬就滑落
-                If gap <= smallest Then Return item.Id
+                ' 留 1.5 mm 余量（半个挤压量）：完全相等时刚好没有穿透，
+                ' 接触求解器给不出法向力，夹持力为 0（7 cm 粗的瓶身实测就是这样滑脱的）
+                If gap <= smallest + 0.0015 Then Return item.Id
             Next
 
             Return Nothing
@@ -1176,6 +1178,8 @@ Namespace Simulation
                     "block-" & (i + 1), spec, position,
                     BuildPlacementRotation(spec, 0.0))
 
+                instance.SpawnPosition = instance.Body.Position
+
                 _world.Add(instance.Body)
                 Objects.Add(instance)
                 out.Add(instance)
@@ -1254,7 +1258,8 @@ Namespace Simulation
                                    Optional rotation As Quaternion? = Nothing,
                                    Optional mass As Double = 0.2,
                                    Optional friction As Double = 0.75,
-                                   Optional color As String = Nothing) As BlockInstance
+                                   Optional color As String = Nothing,
+                                   Optional isStatic As Boolean = False) As BlockInstance
 
             Dim spec As New BlockSpec With {
                 .Shape = BlockFactory.ParseShape(shape),
@@ -1280,6 +1285,12 @@ Namespace Simulation
 
             Dim id As String = "block-" & (Objects.Count + 1)
             Dim instance As BlockInstance = BlockFactory.Create(id, spec, center, placement)
+
+            instance.SpawnPosition = instance.Body.Position
+            instance.IsStatic = isStatic
+
+            ' 桌子这类道具必须是静态体：既不会被机械臂推走，也不会被重力拉下去
+            If isStatic Then Call instance.Body.SetStatic()
 
             _world.Add(instance.Body)
             Objects.Add(instance)
@@ -1368,7 +1379,12 @@ Namespace Simulation
                     .Velocity = StateSnapshot.ToArray(item.Body.Velocity),
                     .Size = StateSnapshot.ToArray(item.Size),
                     .Mass = item.Body.Mass,
-                    .Color = item.Spec.Color
+                    .Color = item.Spec.Color,
+                    .IsStatic = item.IsStatic,
+                    .Posture = ObjectPosture.PostureName(ObjectPosture.PostureOf(item)),
+                    .TiltDeg = ObjectPosture.TiltDegrees(item.Body),
+                    .Displacement = ObjectPosture.Displacement(item),
+                    .Fallen = ObjectPosture.HasFallen(item)
                 })
             Next
 

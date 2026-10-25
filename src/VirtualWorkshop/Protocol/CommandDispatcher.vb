@@ -399,13 +399,15 @@ Namespace Protocol
                 shape, size, location, placement,
                 JsonText.Num(args, "mass", 0.2),
                 JsonText.Num(args, "friction", 0.75),
-                JsonText.Str(args, "color"))
+                JsonText.Str(args, "color"),
+                JsonText.Bool(args, "static", False))
 
             Return New JsonObject From {
                 {"id", instance.Id},
                 {"kind", BlockFactory.ShapeName(instance.Spec.Shape)},
                 {"position", JsonText.ArrayOf(StateSnapshot.ToArray(instance.Body.Position))},
-                {"size", JsonText.ArrayOf(StateSnapshot.ToArray(instance.Size))}
+                {"size", JsonText.ArrayOf(StateSnapshot.ToArray(instance.Size))},
+                {"static", instance.IsStatic}
             }
         End Function
 
