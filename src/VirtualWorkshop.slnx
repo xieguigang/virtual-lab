@@ -55,6 +55,9 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
   </Folder>
+  <Project Path="../../LLMs/src/Ollama/Ollama.vbproj">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
   <Project Path="Controller/Controller.vbproj" Id="9b6e1d0d-080b-4428-9d00-5dd25a832913">
     <Platform Solution="*|x64" Project="x64" />
   </Project>

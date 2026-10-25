@@ -14,6 +14,8 @@
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\mime\application%json\JSON-netcore5.vbproj" />
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\dev\VisualStudio\VisualStudio.NET5.vbproj" />
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\vs_solutions\JavaScript\LiteJs.vbproj" />
+    <!-- LLM 接入（Ollama / OpenAI 兼容客户端） -->
+    <ProjectReference Include="..\..\..\LLMs\src\Ollama\Ollama.vbproj" />
   </ItemGroup>
 
   <ItemGroup>

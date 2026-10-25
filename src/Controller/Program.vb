@@ -1,4 +1,4 @@
-Imports System.Text.Json.Nodes
+﻿Imports System.Text.Json.Nodes
 Imports System.Threading
 
 ''' <summary>
@@ -22,6 +22,9 @@ Module Program
     Function Main(args As String()) As Integer
         Dim scriptPath As String = Nothing
         Dim evalCode As String = Nothing
+        Dim agentTask As String = Nothing
+        Dim llmConfig As String = Nothing
+        Dim listTools As Boolean = False
         Dim showHelp As Boolean = False
         Dim scriptArgs As New List(Of String)()
 
@@ -39,6 +42,14 @@ Module Program
                 Case "--eval", "-e"
                     evalCode = NextArg(args, i)
                     i += 1
+                Case "--agent"
+                    agentTask = NextArg(args, i)
+                    i += 1
+                Case "--llm-config"
+                    llmConfig = NextArg(args, i)
+                    i += 1
+                Case "--llm-tools"
+                    listTools = True
                 Case "--help", "-h", "-?"
                     showHelp = True
                 Case Else
@@ -65,6 +76,15 @@ Module Program
                 If state IsNot Nothing Then Call StatusView.PrintCompact(state)
             End Sub
 
+        If listTools Then
+            Call PrintToolCatalog()
+            Return 0
+        End If
+
+        If Not String.IsNullOrEmpty(agentTask) Then
+            Return RunAgent(agentTask, llmConfig)
+        End If
+
         If Not String.IsNullOrEmpty(scriptPath) Then
             Return RunScript(scriptPath, scriptArgs.ToArray())
         End If
@@ -74,6 +94,74 @@ Module Program
         End If
 
         Return RunRepl()
+    End Function
+
+    ''' <summary>默认的 LLM 配置文件（与 Ollama 库的 <c>LLMConfig</c> 格式一致）。</summary>
+    Private Const DefaultLlmConfig As String = "C:\Users\Administrator\Documents\deepseek.ini"
+
+    ''' <summary>
+    ''' 打印工具清单：把 LLM 能看到的工具与参数列出来。
+    ''' </summary>
+    ''' <remarks>
+    ''' 不需要连接仿真服务，也不发网络请求 —— 用来快速确认「模型到底有哪些动作可用」。
+    ''' </remarks>
+    Private Sub PrintToolCatalog()
+        Dim tools As New LabTools(New ArmJsHost(New ArmClient()))
+        Dim catalog As Ollama.JSON.FunctionCall.FunctionTool() = tools.Catalog()
+
+        Console.WriteLine($"可用工具 ({catalog.Length}):")
+        Console.WriteLine()
+
+        For Each item As Ollama.JSON.FunctionCall.FunctionTool In catalog
+            Dim model As Ollama.JSON.FunctionCall.FunctionModel = item.function
+
+            Console.WriteLine($"  {model.name}  —  {model.description}")
+
+            If model.parameters IsNot Nothing AndAlso model.parameters.properties IsNot Nothing Then
+                For Each arg As Ollama.JSON.FunctionCall.ParameterProperties In model.parameters.properties.Values
+                    Dim required As Boolean = model.parameters.required IsNot Nothing AndAlso
+                                              model.parameters.required.Contains(arg.name)
+
+                    Console.WriteLine($"      {arg.name,-12} {arg.type,-8} {(If(required, "必填", "可选")),-4} {arg.description}")
+                Next
+            End If
+
+            Console.WriteLine()
+        Next
+    End Sub
+
+    ''' <summary>
+    ''' 用 LLM 执行一次自然语言任务。
+    ''' </summary>
+    ''' <remarks>
+    ''' 连接的是同一个仿真服务；工具调用内部复用 <see cref="ArmJsHost"/> 的那套 TCP API，
+    ''' 所以 LLM 走的是和 JS 脚本完全一致的动作通道，不存在「两套行为」。
+    ''' </remarks>
+    Private Function RunAgent(task As String, configPath As String) As Integer
+        If String.IsNullOrEmpty(configPath) Then configPath = DefaultLlmConfig
+        If Not EnsureConnected() Then Return 1
+
+        Dim agent As LabAgent
+
+        Try
+            agent = LabAgent.Create(New ArmJsHost(Client), configPath)
+        Catch ex As Exception
+            Console.Error.WriteLine("创建 LLM 失败: " & ex.Message)
+            Return 2
+        End Try
+
+        Console.WriteLine($"LLM   : {agent.Config.provider} / {agent.Config.model}  (maxRounds={agent.Client.maxRounds})")
+        Console.WriteLine($"任务  : {task}")
+        Console.WriteLine()
+
+        Dim started As DateTime = DateTime.Now
+        Dim output As String = agent.Run(task)
+
+        Console.WriteLine()
+        Console.WriteLine($"=== 最终答复（{agent.ToolCalls} 次工具调用，{(DateTime.Now - started).TotalSeconds:F1} s）===")
+        Console.WriteLine(output)
+
+        Return 0
     End Function
 
     Private Function NextArg(args As String(), index As Integer) As String
