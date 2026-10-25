@@ -38,6 +38,25 @@ Partial Class FormVirtualLab
     Friend m_jointBars As TrackBar()
     Friend m_jointLabels As Label()
     Friend m_jointNames As Label()
+
+    Friend WithEvents m_jointBar0 As TrackBar
+    Friend WithEvents m_jointBar1 As TrackBar
+    Friend WithEvents m_jointBar2 As TrackBar
+    Friend WithEvents m_jointBar3 As TrackBar
+    Friend WithEvents m_jointBar4 As TrackBar
+    Friend WithEvents m_jointBar5 As TrackBar
+    Friend WithEvents m_jointLabel0 As Label
+    Friend WithEvents m_jointLabel1 As Label
+    Friend WithEvents m_jointLabel2 As Label
+    Friend WithEvents m_jointLabel3 As Label
+    Friend WithEvents m_jointLabel4 As Label
+    Friend WithEvents m_jointLabel5 As Label
+    Friend WithEvents m_jointName0 As Label
+    Friend WithEvents m_jointName1 As Label
+    Friend WithEvents m_jointName2 As Label
+    Friend WithEvents m_jointName3 As Label
+    Friend WithEvents m_jointName4 As Label
+    Friend WithEvents m_jointName5 As Label
     Friend WithEvents m_lblTcp As Label
     Friend WithEvents m_lblGripper As Label
     Friend WithEvents m_numGripForce As NumericUpDown
@@ -96,28 +115,24 @@ Partial Class FormVirtualLab
         Me.jointCard = New Panel()
         Me.jointCardHeader = New Label()
         Me.jointsHost = New Panel()
-        Me.m_jointBars = New TrackBar(5) {}
-        Me.m_jointLabels = New Label(5) {}
-        Me.m_jointNames = New Label(5) {}
-
-        Me.m_jointNames(0) = New Label()
-        Me.m_jointBars(0) = New TrackBar()
-        Me.m_jointLabels(0) = New Label()
-        Me.m_jointNames(1) = New Label()
-        Me.m_jointBars(1) = New TrackBar()
-        Me.m_jointLabels(1) = New Label()
-        Me.m_jointNames(2) = New Label()
-        Me.m_jointBars(2) = New TrackBar()
-        Me.m_jointLabels(2) = New Label()
-        Me.m_jointNames(3) = New Label()
-        Me.m_jointBars(3) = New TrackBar()
-        Me.m_jointLabels(3) = New Label()
-        Me.m_jointNames(4) = New Label()
-        Me.m_jointBars(4) = New TrackBar()
-        Me.m_jointLabels(4) = New Label()
-        Me.m_jointNames(5) = New Label()
-        Me.m_jointBars(5) = New TrackBar()
-        Me.m_jointLabels(5) = New Label()
+        Me.m_jointBar0 = New TrackBar()
+        Me.m_jointLabel0 = New Label()
+        Me.m_jointName0 = New Label()
+        Me.m_jointBar1 = New TrackBar()
+        Me.m_jointLabel1 = New Label()
+        Me.m_jointName1 = New Label()
+        Me.m_jointBar2 = New TrackBar()
+        Me.m_jointLabel2 = New Label()
+        Me.m_jointName2 = New Label()
+        Me.m_jointBar3 = New TrackBar()
+        Me.m_jointLabel3 = New Label()
+        Me.m_jointName3 = New Label()
+        Me.m_jointBar4 = New TrackBar()
+        Me.m_jointLabel4 = New Label()
+        Me.m_jointName4 = New Label()
+        Me.m_jointBar5 = New TrackBar()
+        Me.m_jointLabel5 = New Label()
+        Me.m_jointName5 = New Label()
 
         Me.tcpCard = New Panel()
         Me.tcpCardHeader = New Label()
@@ -363,202 +378,202 @@ Partial Class FormVirtualLab
         Me.jointCard.Controls.Add(Me.jointsHost)
 
         ' 关节 1 (J1 腰)
-        Me.m_jointNames(0).Text = "J1 腰"
-        Me.m_jointNames(0).Left = 0
-        Me.m_jointNames(0).Top = 4
-        Me.m_jointNames(0).Width = 52
-        Me.m_jointNames(0).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(0).BackColor = Color.Transparent
-        Me.m_jointNames(0).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName0.Text = "J1 腰"
+        Me.m_jointName0.Left = 0
+        Me.m_jointName0.Top = 4
+        Me.m_jointName0.Width = 52
+        Me.m_jointName0.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName0.BackColor = Color.Transparent
+        Me.m_jointName0.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(0).Left = 54
-        Me.m_jointBars(0).Top = 0
-        Me.m_jointBars(0).Width = 232
-        Me.m_jointBars(0).Height = 26
-        Me.m_jointBars(0).Minimum = -1000
-        Me.m_jointBars(0).Maximum = 1000
-        Me.m_jointBars(0).TickStyle = TickStyle.None
-        Me.m_jointBars(0).SmallChange = 5
-        Me.m_jointBars(0).LargeChange = 50
-        Me.m_jointBars(0).Value = 0
+        Me.m_jointBar0.Left = 54
+        Me.m_jointBar0.Top = 0
+        Me.m_jointBar0.Width = 232
+        Me.m_jointBar0.Height = 26
+        Me.m_jointBar0.Minimum = -1000
+        Me.m_jointBar0.Maximum = 1000
+        Me.m_jointBar0.TickStyle = TickStyle.None
+        Me.m_jointBar0.SmallChange = 5
+        Me.m_jointBar0.LargeChange = 50
+        Me.m_jointBar0.Value = 0
 
-        Me.m_jointLabels(0).Text = "0.000"
-        Me.m_jointLabels(0).Left = 292
-        Me.m_jointLabels(0).Top = 4
-        Me.m_jointLabels(0).Width = 58
-        Me.m_jointLabels(0).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(0).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(0).BackColor = Color.Transparent
-        Me.m_jointLabels(0).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel0.Text = "0.000"
+        Me.m_jointLabel0.Left = 292
+        Me.m_jointLabel0.Top = 4
+        Me.m_jointLabel0.Width = 58
+        Me.m_jointLabel0.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel0.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel0.BackColor = Color.Transparent
+        Me.m_jointLabel0.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(0))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(0))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(0))
+        Me.jointsHost.Controls.Add(Me.m_jointName0)
+        Me.jointsHost.Controls.Add(Me.m_jointBar0)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel0)
 
         ' 关节 2 (J2 肩)
-        Me.m_jointNames(1).Text = "J2 肩"
-        Me.m_jointNames(1).Left = 0
-        Me.m_jointNames(1).Top = 32
-        Me.m_jointNames(1).Width = 52
-        Me.m_jointNames(1).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(1).BackColor = Color.Transparent
-        Me.m_jointNames(1).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName1.Text = "J2 肩"
+        Me.m_jointName1.Left = 0
+        Me.m_jointName1.Top = 32
+        Me.m_jointName1.Width = 52
+        Me.m_jointName1.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName1.BackColor = Color.Transparent
+        Me.m_jointName1.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(1).Left = 54
-        Me.m_jointBars(1).Top = 28
-        Me.m_jointBars(1).Width = 232
-        Me.m_jointBars(1).Height = 26
-        Me.m_jointBars(1).Minimum = -1000
-        Me.m_jointBars(1).Maximum = 1000
-        Me.m_jointBars(1).TickStyle = TickStyle.None
-        Me.m_jointBars(1).SmallChange = 5
-        Me.m_jointBars(1).LargeChange = 50
-        Me.m_jointBars(1).Value = 0
+        Me.m_jointBar1.Left = 54
+        Me.m_jointBar1.Top = 28
+        Me.m_jointBar1.Width = 232
+        Me.m_jointBar1.Height = 26
+        Me.m_jointBar1.Minimum = -1000
+        Me.m_jointBar1.Maximum = 1000
+        Me.m_jointBar1.TickStyle = TickStyle.None
+        Me.m_jointBar1.SmallChange = 5
+        Me.m_jointBar1.LargeChange = 50
+        Me.m_jointBar1.Value = 0
 
-        Me.m_jointLabels(1).Text = "0.000"
-        Me.m_jointLabels(1).Left = 292
-        Me.m_jointLabels(1).Top = 32
-        Me.m_jointLabels(1).Width = 58
-        Me.m_jointLabels(1).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(1).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(1).BackColor = Color.Transparent
-        Me.m_jointLabels(1).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel1.Text = "0.000"
+        Me.m_jointLabel1.Left = 292
+        Me.m_jointLabel1.Top = 32
+        Me.m_jointLabel1.Width = 58
+        Me.m_jointLabel1.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel1.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel1.BackColor = Color.Transparent
+        Me.m_jointLabel1.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(1))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(1))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(1))
+        Me.jointsHost.Controls.Add(Me.m_jointName1)
+        Me.jointsHost.Controls.Add(Me.m_jointBar1)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel1)
 
         ' 关节 3 (J3 肘)
-        Me.m_jointNames(2).Text = "J3 肘"
-        Me.m_jointNames(2).Left = 0
-        Me.m_jointNames(2).Top = 60
-        Me.m_jointNames(2).Width = 52
-        Me.m_jointNames(2).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(2).BackColor = Color.Transparent
-        Me.m_jointNames(2).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName2.Text = "J3 肘"
+        Me.m_jointName2.Left = 0
+        Me.m_jointName2.Top = 60
+        Me.m_jointName2.Width = 52
+        Me.m_jointName2.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName2.BackColor = Color.Transparent
+        Me.m_jointName2.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(2).Left = 54
-        Me.m_jointBars(2).Top = 56
-        Me.m_jointBars(2).Width = 232
-        Me.m_jointBars(2).Height = 26
-        Me.m_jointBars(2).Minimum = -1000
-        Me.m_jointBars(2).Maximum = 1000
-        Me.m_jointBars(2).TickStyle = TickStyle.None
-        Me.m_jointBars(2).SmallChange = 5
-        Me.m_jointBars(2).LargeChange = 50
-        Me.m_jointBars(2).Value = 0
+        Me.m_jointBar2.Left = 54
+        Me.m_jointBar2.Top = 56
+        Me.m_jointBar2.Width = 232
+        Me.m_jointBar2.Height = 26
+        Me.m_jointBar2.Minimum = -1000
+        Me.m_jointBar2.Maximum = 1000
+        Me.m_jointBar2.TickStyle = TickStyle.None
+        Me.m_jointBar2.SmallChange = 5
+        Me.m_jointBar2.LargeChange = 50
+        Me.m_jointBar2.Value = 0
 
-        Me.m_jointLabels(2).Text = "0.000"
-        Me.m_jointLabels(2).Left = 292
-        Me.m_jointLabels(2).Top = 60
-        Me.m_jointLabels(2).Width = 58
-        Me.m_jointLabels(2).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(2).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(2).BackColor = Color.Transparent
-        Me.m_jointLabels(2).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel2.Text = "0.000"
+        Me.m_jointLabel2.Left = 292
+        Me.m_jointLabel2.Top = 60
+        Me.m_jointLabel2.Width = 58
+        Me.m_jointLabel2.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel2.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel2.BackColor = Color.Transparent
+        Me.m_jointLabel2.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(2))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(2))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(2))
+        Me.jointsHost.Controls.Add(Me.m_jointName2)
+        Me.jointsHost.Controls.Add(Me.m_jointBar2)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel2)
 
         ' 关节 4 (J4 腕转)
-        Me.m_jointNames(3).Text = "J4 腕转"
-        Me.m_jointNames(3).Left = 0
-        Me.m_jointNames(3).Top = 88
-        Me.m_jointNames(3).Width = 52
-        Me.m_jointNames(3).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(3).BackColor = Color.Transparent
-        Me.m_jointNames(3).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName3.Text = "J4 腕转"
+        Me.m_jointName3.Left = 0
+        Me.m_jointName3.Top = 88
+        Me.m_jointName3.Width = 52
+        Me.m_jointName3.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName3.BackColor = Color.Transparent
+        Me.m_jointName3.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(3).Left = 54
-        Me.m_jointBars(3).Top = 84
-        Me.m_jointBars(3).Width = 232
-        Me.m_jointBars(3).Height = 26
-        Me.m_jointBars(3).Minimum = -1000
-        Me.m_jointBars(3).Maximum = 1000
-        Me.m_jointBars(3).TickStyle = TickStyle.None
-        Me.m_jointBars(3).SmallChange = 5
-        Me.m_jointBars(3).LargeChange = 50
-        Me.m_jointBars(3).Value = 0
+        Me.m_jointBar3.Left = 54
+        Me.m_jointBar3.Top = 84
+        Me.m_jointBar3.Width = 232
+        Me.m_jointBar3.Height = 26
+        Me.m_jointBar3.Minimum = -1000
+        Me.m_jointBar3.Maximum = 1000
+        Me.m_jointBar3.TickStyle = TickStyle.None
+        Me.m_jointBar3.SmallChange = 5
+        Me.m_jointBar3.LargeChange = 50
+        Me.m_jointBar3.Value = 0
 
-        Me.m_jointLabels(3).Text = "0.000"
-        Me.m_jointLabels(3).Left = 292
-        Me.m_jointLabels(3).Top = 88
-        Me.m_jointLabels(3).Width = 58
-        Me.m_jointLabels(3).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(3).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(3).BackColor = Color.Transparent
-        Me.m_jointLabels(3).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel3.Text = "0.000"
+        Me.m_jointLabel3.Left = 292
+        Me.m_jointLabel3.Top = 88
+        Me.m_jointLabel3.Width = 58
+        Me.m_jointLabel3.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel3.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel3.BackColor = Color.Transparent
+        Me.m_jointLabel3.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(3))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(3))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(3))
+        Me.jointsHost.Controls.Add(Me.m_jointName3)
+        Me.jointsHost.Controls.Add(Me.m_jointBar3)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel3)
 
         ' 关节 5 (J5 腕摆)
-        Me.m_jointNames(4).Text = "J5 腕摆"
-        Me.m_jointNames(4).Left = 0
-        Me.m_jointNames(4).Top = 116
-        Me.m_jointNames(4).Width = 52
-        Me.m_jointNames(4).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(4).BackColor = Color.Transparent
-        Me.m_jointNames(4).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName4.Text = "J5 腕摆"
+        Me.m_jointName4.Left = 0
+        Me.m_jointName4.Top = 116
+        Me.m_jointName4.Width = 52
+        Me.m_jointName4.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName4.BackColor = Color.Transparent
+        Me.m_jointName4.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(4).Left = 54
-        Me.m_jointBars(4).Top = 112
-        Me.m_jointBars(4).Width = 232
-        Me.m_jointBars(4).Height = 26
-        Me.m_jointBars(4).Minimum = -1000
-        Me.m_jointBars(4).Maximum = 1000
-        Me.m_jointBars(4).TickStyle = TickStyle.None
-        Me.m_jointBars(4).SmallChange = 5
-        Me.m_jointBars(4).LargeChange = 50
-        Me.m_jointBars(4).Value = 0
+        Me.m_jointBar4.Left = 54
+        Me.m_jointBar4.Top = 112
+        Me.m_jointBar4.Width = 232
+        Me.m_jointBar4.Height = 26
+        Me.m_jointBar4.Minimum = -1000
+        Me.m_jointBar4.Maximum = 1000
+        Me.m_jointBar4.TickStyle = TickStyle.None
+        Me.m_jointBar4.SmallChange = 5
+        Me.m_jointBar4.LargeChange = 50
+        Me.m_jointBar4.Value = 0
 
-        Me.m_jointLabels(4).Text = "0.000"
-        Me.m_jointLabels(4).Left = 292
-        Me.m_jointLabels(4).Top = 116
-        Me.m_jointLabels(4).Width = 58
-        Me.m_jointLabels(4).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(4).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(4).BackColor = Color.Transparent
-        Me.m_jointLabels(4).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel4.Text = "0.000"
+        Me.m_jointLabel4.Left = 292
+        Me.m_jointLabel4.Top = 116
+        Me.m_jointLabel4.Width = 58
+        Me.m_jointLabel4.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel4.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel4.BackColor = Color.Transparent
+        Me.m_jointLabel4.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(4))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(4))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(4))
+        Me.jointsHost.Controls.Add(Me.m_jointName4)
+        Me.jointsHost.Controls.Add(Me.m_jointBar4)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel4)
 
         ' 关节 6 (J6 腕旋)
-        Me.m_jointNames(5).Text = "J6 腕旋"
-        Me.m_jointNames(5).Left = 0
-        Me.m_jointNames(5).Top = 144
-        Me.m_jointNames(5).Width = 52
-        Me.m_jointNames(5).ForeColor = Color.FromArgb(71, 85, 105)
-        Me.m_jointNames(5).BackColor = Color.Transparent
-        Me.m_jointNames(5).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointName5.Text = "J6 腕旋"
+        Me.m_jointName5.Left = 0
+        Me.m_jointName5.Top = 144
+        Me.m_jointName5.Width = 52
+        Me.m_jointName5.ForeColor = Color.FromArgb(71, 85, 105)
+        Me.m_jointName5.BackColor = Color.Transparent
+        Me.m_jointName5.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.m_jointBars(5).Left = 54
-        Me.m_jointBars(5).Top = 140
-        Me.m_jointBars(5).Width = 232
-        Me.m_jointBars(5).Height = 26
-        Me.m_jointBars(5).Minimum = -1000
-        Me.m_jointBars(5).Maximum = 1000
-        Me.m_jointBars(5).TickStyle = TickStyle.None
-        Me.m_jointBars(5).SmallChange = 5
-        Me.m_jointBars(5).LargeChange = 50
-        Me.m_jointBars(5).Value = 0
+        Me.m_jointBar5.Left = 54
+        Me.m_jointBar5.Top = 140
+        Me.m_jointBar5.Width = 232
+        Me.m_jointBar5.Height = 26
+        Me.m_jointBar5.Minimum = -1000
+        Me.m_jointBar5.Maximum = 1000
+        Me.m_jointBar5.TickStyle = TickStyle.None
+        Me.m_jointBar5.SmallChange = 5
+        Me.m_jointBar5.LargeChange = 50
+        Me.m_jointBar5.Value = 0
 
-        Me.m_jointLabels(5).Text = "0.000"
-        Me.m_jointLabels(5).Left = 292
-        Me.m_jointLabels(5).Top = 144
-        Me.m_jointLabels(5).Width = 58
-        Me.m_jointLabels(5).TextAlign = ContentAlignment.MiddleRight
-        Me.m_jointLabels(5).ForeColor = Color.FromArgb(14, 165, 233)
-        Me.m_jointLabels(5).BackColor = Color.Transparent
-        Me.m_jointLabels(5).Font = New Font("Consolas", 8.0F, FontStyle.Regular)
+        Me.m_jointLabel5.Text = "0.000"
+        Me.m_jointLabel5.Left = 292
+        Me.m_jointLabel5.Top = 144
+        Me.m_jointLabel5.Width = 58
+        Me.m_jointLabel5.TextAlign = ContentAlignment.MiddleRight
+        Me.m_jointLabel5.ForeColor = Color.FromArgb(14, 165, 233)
+        Me.m_jointLabel5.BackColor = Color.Transparent
+        Me.m_jointLabel5.Font = New Font("Consolas", 8.0F, FontStyle.Regular)
 
-        Me.jointsHost.Controls.Add(Me.m_jointNames(5))
-        Me.jointsHost.Controls.Add(Me.m_jointBars(5))
-        Me.jointsHost.Controls.Add(Me.m_jointLabels(5))
+        Me.jointsHost.Controls.Add(Me.m_jointName5)
+        Me.jointsHost.Controls.Add(Me.m_jointBar5)
+        Me.jointsHost.Controls.Add(Me.m_jointLabel5)
 
         ' TCP 位姿卡片
         Me.tcpCard.Dock = DockStyle.None

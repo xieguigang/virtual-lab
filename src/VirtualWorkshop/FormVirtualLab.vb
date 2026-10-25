@@ -49,6 +49,11 @@ Public Class FormVirtualLab
     Private Sub FormVirtualLab_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Text = "VirtualWorkshop · 六轴机械臂虚拟硬件仿真工作台"
 
+        ' 将设计器中逐个声明的关节控件收集回数组，供后续逻辑按索引访问
+        Me.m_jointBars = {Me.m_jointBar0, Me.m_jointBar1, Me.m_jointBar2, Me.m_jointBar3, Me.m_jointBar4, Me.m_jointBar5}
+        Me.m_jointLabels = {Me.m_jointLabel0, Me.m_jointLabel1, Me.m_jointLabel2, Me.m_jointLabel3, Me.m_jointLabel4, Me.m_jointLabel5}
+        Me.m_jointNames = {Me.m_jointName0, Me.m_jointName1, Me.m_jointName2, Me.m_jointName3, Me.m_jointName4, Me.m_jointName5}
+
         Call LogLine("工作台启动", UiTheme.Accent)
 
         If _preset Is Nothing OrElse Not _preset.Ready Then
