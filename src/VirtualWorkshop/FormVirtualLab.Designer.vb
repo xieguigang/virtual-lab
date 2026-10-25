@@ -49,6 +49,10 @@ Partial Class FormVirtualLab
     Friend WithEvents m_status As StatusStrip
     Friend WithEvents m_statusLabel As ToolStripStatusLabel
 
+    Dim brand As Label
+    Dim flow As FlowLayoutPanel
+    Dim realtimeLabel As Label
+
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
         Me.components = New System.ComponentModel.Container()
@@ -78,25 +82,24 @@ Partial Class FormVirtualLab
         Me.m_top.BackColor = UiTheme.PanelColor
         Me.m_top.Padding = New Padding(12, 0, 12, 0)
 
-        Dim brand As New Label With {
-            .Text = "VIRTUAL WORKSHOP",
-            .AutoSize = False,
-            .Width = 190,
-            .Dock = DockStyle.Left,
-            .TextAlign = ContentAlignment.MiddleLeft,
-            .ForeColor = UiTheme.Accent,
-            .Font = UiTheme.FontTitle,
-            .BackColor = Color.Transparent
-        }
+        brand = New Label
+        brand.Text = "VIRTUAL WORKSHOP"
+        brand.AutoSize = False
+        brand.Width = 190
+        brand.Dock = DockStyle.Left
+        brand.TextAlign = ContentAlignment.MiddleLeft
+        brand.ForeColor = UiTheme.Accent
+        brand.Font = UiTheme.FontTitle
+        brand.BackColor = Color.Transparent
 
-        Dim flow As New FlowLayoutPanel With {
-            .Dock = DockStyle.Left,
-            .Width = 780,
-            .FlowDirection = FlowDirection.LeftToRight,
-            .WrapContents = False,
-            .Padding = New Padding(0, 14, 0, 0),
-            .BackColor = Color.Transparent
-        }
+
+        flow = New FlowLayoutPanel
+        flow.Dock = DockStyle.Left
+        flow.Width = 780
+        flow.FlowDirection = FlowDirection.LeftToRight
+        flow.WrapContents = False
+        flow.Padding = New Padding(0, 14, 0, 0)
+        flow.BackColor = Color.Transparent
 
         Me.m_btnStart = UiTheme.CreatePrimaryButton("启动服务", 92)
         Me.m_btnStopServer = UiTheme.CreateButton("停止服务", UiTheme.Warn)
@@ -106,25 +109,25 @@ Partial Class FormVirtualLab
         Me.m_btnEstop = UiTheme.CreateButton("急停", UiTheme.Danger, 72)
         Me.m_btnReset = UiTheme.CreateButton("复位场景", UiTheme.Warn)
 
-        Dim realtimeLabel As New Label With {
-            .Text = "倍率",
-            .AutoSize = True,
-            .ForeColor = UiTheme.TextMuted,
-            .Margin = New Padding(12, 6, 4, 0)
-        }
+        realtimeLabel = New Label
+        realtimeLabel.Text = "倍率"
+        realtimeLabel.AutoSize = True
+        realtimeLabel.ForeColor = UiTheme.TextMuted
+        realtimeLabel.Margin = New Padding(12, 6, 4, 0)
 
-        Me.m_numRealtime = New NumericUpDown With {
-            .DecimalPlaces = 1,
-            .Minimum = 0D,
-            .Maximum = 20D,
-            .Increment = 0.5D,
-            .Value = 1D,
-            .Width = 62,
-            .BackColor = UiTheme.PanelAlt,
-            .ForeColor = UiTheme.TextPrimary,
-            .BorderStyle = BorderStyle.FixedSingle,
-            .Margin = New Padding(0, 2, 0, 0)
-        }
+
+        Me.m_numRealtime = New NumericUpDown
+        m_numRealtime.DecimalPlaces = 1
+        m_numRealtime.Minimum = 0D
+        m_numRealtime.Maximum = 20D
+        m_numRealtime.Increment = 0.5D
+        m_numRealtime.Value = 1D
+        m_numRealtime.Width = 62
+        m_numRealtime.BackColor = UiTheme.PanelAlt
+        m_numRealtime.ForeColor = UiTheme.TextPrimary
+        m_numRealtime.BorderStyle = BorderStyle.FixedSingle
+        m_numRealtime.Margin = New Padding(0, 2, 0, 0)
+
 
         flow.Controls.Add(Me.m_btnStart)
         flow.Controls.Add(Me.m_btnStopServer)
