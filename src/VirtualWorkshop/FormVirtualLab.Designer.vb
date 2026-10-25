@@ -88,6 +88,7 @@ Partial Class FormVirtualLab
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
         components = New ComponentModel.Container()
+        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(FormVirtualLab))
         m_top = New Panel()
         Panel1 = New Panel()
         m_btnStart = New Button()
@@ -139,8 +140,8 @@ Partial Class FormVirtualLab
         forceLabel = New Label()
         gripCardHeader = New Label()
         objectCard = New Panel()
-        objectCardHeader = New Label()
         m_lstObjects = New ListBox()
+        objectCardHeader = New Label()
         m_bottom = New Panel()
         m_log = New RichTextBox()
         m_viewport = New Panel()
@@ -184,7 +185,7 @@ Partial Class FormVirtualLab
         m_top.Location = New Point(0, 0)
         m_top.Name = "m_top"
         m_top.Padding = New Padding(12, 0, 12, 0)
-        m_top.Size = New Size(1608, 97)
+        m_top.Size = New Size(1608, 81)
         m_top.TabIndex = 3
         ' 
         ' Panel1
@@ -198,7 +199,7 @@ Partial Class FormVirtualLab
         Panel1.Controls.Add(m_btnReset)
         Panel1.Controls.Add(m_btnHold)
         Panel1.Controls.Add(m_btnEstop)
-        Panel1.Location = New Point(196, 25)
+        Panel1.Location = New Point(198, 16)
         Panel1.Name = "Panel1"
         Panel1.Size = New Size(803, 45)
         Panel1.TabIndex = 1
@@ -367,7 +368,7 @@ Partial Class FormVirtualLab
         brand.BackColor = Color.Transparent
         brand.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
         brand.ForeColor = Color.FromArgb(CByte(14), CByte(165), CByte(233))
-        brand.Location = New Point(12, 25)
+        brand.Location = New Point(14, 16)
         brand.Name = "brand"
         brand.Size = New Size(190, 23)
         brand.TabIndex = 1
@@ -383,7 +384,7 @@ Partial Class FormVirtualLab
         tcpCard.Margin = New Padding(0, 0, 0, 8)
         tcpCard.Name = "tcpCard"
         tcpCard.Padding = New Padding(12, 10, 12, 10)
-        tcpCard.Size = New Size(302, 86)
+        tcpCard.Size = New Size(302, 80)
         tcpCard.TabIndex = 2
         ' 
         ' m_lblTcp
@@ -394,7 +395,7 @@ Partial Class FormVirtualLab
         m_lblTcp.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
         m_lblTcp.Location = New Point(12, 32)
         m_lblTcp.Name = "m_lblTcp"
-        m_lblTcp.Size = New Size(278, 44)
+        m_lblTcp.Size = New Size(278, 38)
         m_lblTcp.TabIndex = 1
         m_lblTcp.Text = "x 0.000  y 0.000  z 0.000" & vbCrLf & "rx 0.0  ry 0.0  rz 0.0"
         ' 
@@ -418,7 +419,7 @@ Partial Class FormVirtualLab
         m_lblService.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
         m_lblService.Location = New Point(1346, 0)
         m_lblService.Name = "m_lblService"
-        m_lblService.Size = New Size(250, 97)
+        m_lblService.Size = New Size(250, 81)
         m_lblService.TabIndex = 2
         m_lblService.Text = "离线"
         m_lblService.TextAlign = ContentAlignment.MiddleRight
@@ -433,10 +434,10 @@ Partial Class FormVirtualLab
         m_side.Controls.Add(objectCard)
         m_side.Dock = DockStyle.Right
         m_side.FlowDirection = FlowDirection.TopDown
-        m_side.Location = New Point(1222, 97)
+        m_side.Location = New Point(1222, 81)
         m_side.Name = "m_side"
         m_side.Padding = New Padding(8)
-        m_side.Size = New Size(386, 826)
+        m_side.Size = New Size(386, 842)
         m_side.TabIndex = 1
         m_side.WrapContents = False
         ' 
@@ -880,18 +881,6 @@ Partial Class FormVirtualLab
         objectCard.Size = New Size(352, 124)
         objectCard.TabIndex = 4
         ' 
-        ' objectCardHeader
-        ' 
-        objectCardHeader.BackColor = Color.Transparent
-        objectCardHeader.Dock = DockStyle.Top
-        objectCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
-        objectCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
-        objectCardHeader.Location = New Point(12, 10)
-        objectCardHeader.Name = "objectCardHeader"
-        objectCardHeader.Size = New Size(328, 22)
-        objectCardHeader.TabIndex = 0
-        objectCardHeader.Text = "场景物体"
-        ' 
         ' m_lstObjects
         ' 
         m_lstObjects.BackColor = Color.White
@@ -904,6 +893,18 @@ Partial Class FormVirtualLab
         m_lstObjects.Name = "m_lstObjects"
         m_lstObjects.Size = New Size(328, 82)
         m_lstObjects.TabIndex = 1
+        ' 
+        ' objectCardHeader
+        ' 
+        objectCardHeader.BackColor = Color.Transparent
+        objectCardHeader.Dock = DockStyle.Top
+        objectCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        objectCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        objectCardHeader.Location = New Point(12, 10)
+        objectCardHeader.Name = "objectCardHeader"
+        objectCardHeader.Size = New Size(328, 22)
+        objectCardHeader.TabIndex = 0
+        objectCardHeader.Text = "场景物体"
         ' 
         ' m_bottom
         ' 
@@ -938,9 +939,9 @@ Partial Class FormVirtualLab
         m_viewport.BackColor = Color.FromArgb(CByte(248), CByte(250), CByte(252))
         m_viewport.Controls.Add(m_canvas)
         m_viewport.Dock = DockStyle.Fill
-        m_viewport.Location = New Point(0, 97)
+        m_viewport.Location = New Point(0, 81)
         m_viewport.Name = "m_viewport"
-        m_viewport.Size = New Size(1222, 826)
+        m_viewport.Size = New Size(1222, 842)
         m_viewport.TabIndex = 0
         ' 
         ' m_canvas
@@ -951,7 +952,7 @@ Partial Class FormVirtualLab
         m_canvas.Dock = DockStyle.Fill
         m_canvas.Location = New Point(0, 0)
         m_canvas.Name = "m_canvas"
-        m_canvas.Size = New Size(1222, 826)
+        m_canvas.Size = New Size(1222, 842)
         m_canvas.TabIndex = 0
         ' 
         ' m_timer
@@ -1003,6 +1004,7 @@ Partial Class FormVirtualLab
         DoubleBuffered = True
         Font = New Font("Microsoft YaHei UI", 9F)
         ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        Icon = CType(resources.GetObject("$this.Icon"), Icon)
         MinimumSize = New Size(1180, 780)
         Name = "FormVirtualLab"
         Text = "VirtualWorkshop · 六轴机械臂虚拟硬件仿真工作台"
