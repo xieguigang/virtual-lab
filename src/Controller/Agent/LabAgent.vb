@@ -82,7 +82,7 @@ Public Class LabAgent
     Private Function InvokeTool(fc As FunctionCall) As String
         ToolCalls += 1
 
-        Dim arguments As String = ""
+        Dim arguments As String = If(fc Is Nothing OrElse fc.arguments Is Nothing, "NULL", $"{fc.arguments.Count} 项")
 
         If fc IsNot Nothing AndAlso fc.arguments IsNot Nothing Then
             arguments = String.Join(", ", fc.arguments.Select(Function(a) $"{a.Key}={a.Value}"))
