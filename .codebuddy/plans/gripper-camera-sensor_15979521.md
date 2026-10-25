@@ -32,166 +32,163 @@ todos:
       - protocol-api
 ---
 
-## 用户需求
-
-在 `src\Controller\scripts` 中新增一个更复杂的 JS 演示脚本：地面上有一组弹簧，弹簧上托着一块正方形木板；木板上重量分布不均时，木板在不均匀重力与弹簧力的相互作用下发生倾斜，倾斜木板上的重物会在重力与摩擦力的相互作用下产生滑动；地面上另有 4 块重块，机械臂要依次拾取并放到木板上、不断调整位置，最终让木板保持平衡。
-
 ## 产品概述
-
-这是一个"感知-决策-动作"闭环的综合演示：仿真侧提供真实的压簧-木板-重块动力学（弹簧力、重力矩、库仑摩擦、滑动），上位机侧用 JS 脚本读取木板倾角、决定下一块重块的落点、驱动机械臂完成抓取与放置，最后用微调轮次把倾角收敛到阈值内。整个过程通过现有的虚拟硬件协议（TCP/HTTP）与 LiteJs 宿主 API 完成。
+把弹簧平台从"每帧施加一个力"改为"真正的弹簧连接"。弹簧两端分别固定在**地面锚点**与**木板底面四角**，双向受力（可压可拉），并同时提供**轴向刚度**与**横向（剪切）刚度**。目标是让木板既不会因为冲击被压到行程限位，也不会横向漂移，同时保留肉眼可见的倾斜；使"搬运四块重块、读倾角、把木板配平"的演示能够稳定跑完。
 
 ## 核心功能
-
-- 弹簧物理：木板四角各一根压簧支撑在地面上，可配置刚度、阻尼、自然长度；偏心负载时各簧压缩量不同，木板倾斜到力矩重新平衡为止。
-- 木板与重物：木板是受弹簧支撑的动态刚体；重块放在木板上后随倾角滑动（重力分量大于静摩擦时滑落）。
-- 机械臂配平：依次拾取地面上的 4 块重块放到木板，每放一块读一次倾角，按倾斜方向把下一块放到翘起的一侧，最后微调至平衡。
-- 可视化：三维视口里把弹簧画成随压缩量实时伸缩的螺旋线。
-- 状态反馈：协议状态里提供木板 id、X/Y 倾角、倾角幅值、各簧压缩量与弹力。
+- 弹簧成为"连接件"：两端严格跟随各自的锚点，木板被抬起时弹簧拉回、被压低时推开，不再出现"脱离弹簧"或"只靠穿透深度支撑"的现象
+- 弹簧同时具备轴向刚度与横向剪切刚度；横向允许 1 mm 的微量错位不产生力（死区），超过后按轴向刚度的一半拉回
+- 木板受偏心负载时四角弹簧压缩量不同、木板产生 2 至 3 度的倾斜；负载移除后能平滑回弹到水平
+- 木板在受到碰撞后不会横向漂走；即使把阻尼参数调得很大也不会发散
+- 三维视口里弹簧上下两端都贴合地面与板底，随压缩量实时伸缩
+- 状态与协议继续输出每根弹簧的压缩量、弹力、长度与自然长度，供脚本判断与配平
+- 机械臂演示脚本能完整跑通：依次拾取四块重块放到木板四象限，按倾角反馈调整，最终倾角收敛
 
 
 ## 技术栈
+- 物理引擎：`G:\GCModeller\src\runtime\sciBASIC#\physics\Engine`（VB.NET，既有 `PhysicsWorld3D` / `RigidBody3D` / `IConstraint3D`）
+- 仿真工作台：`G:\virtual-lab\src\VirtualWorkshop`（VB.NET，x64）
+- 上位机与脚本：`G:\virtual-lab\src\Controller`（LiteJs）
+- 渲染：`DxScene3DCanvas` 表面几何 + `OverlayRenderer` 动态线通道
 
-- 语言与框架：VB.NET，`net10.0-windows`（VirtualWorkshop）与 `net10.0`（Controller），沿用现有工程与引用，不新增第三方依赖。
-- 物理：`Microsoft.VisualBasic.Engine.Physics`（PhysicsEngine）：`PhysicsWorld3D`、`RigidBody3D`、`ForceField3D`、`BoxCollider3D`；**新增 3D 压簧**。
-- 脚本：`LiteJs` 解释器 + `ArmJsHost` 宿主门面（注入 `arm` 全局对象）。
-- 通信：现有 NDJSON over TCP / HTTP 协议，只新增指令与状态字段。
+## 实现思路
 
-## 实现方案与关键决策
+### 1) 为什么必须改成"约束"而不是继续调"力"
+现有 `ForceFields3D\Spring3D.vb` 是**显式力**：每子步在积分速度前调用 `ApplyForceAtPoint`。这会带来三个无法通过调参解决的病态：
+- 刚度或阻尼一大就发散（实测 `damping=300` 木板飞到 6 m，`damping=100` 抬块后冲过平衡点 2.3 cm）
+- 支撑力只能靠穿透深度表达，参数对 `Slop`、`MaxForce`、`ShearStiffness` 极度敏感
+- 横向刚度与倾斜互相打架：`4k` 时倾斜被压掉 4 至 20 倍，`1k` 才恢复但抑制漂移不足
 
-### 1. 为什么要在 PhysicsEngine 里新增 Spring3D
+因此新增 `Joints3D\SpringJoint3D.vb`，实现 `IConstraint3D`，在**速度层用柔度（compliance）求解冲量**。引擎每个子步对 `Constraints` 做 3 轮 `SolveVelocity`，随后 `SolvePosition` 做温和位置修正，这正好是软约束该待的位置；大刚度也能稳定。
 
-引擎的 `SpringJoint.vb` 是 **2D** 的，3D 侧只有 `BallJoint3D / HingeJoint3D / PrismaticJoint3D`（以及我们此前新增的 `RevoluteJoint3D / JointServo3D`）和 `ForceFields3D\{ForceField3D, GravityField3D}`，**没有任何 3D 弹簧**。按用户此前要求"缺失的仿真算法补进 PhysicsEngine 以便复用"，新增 `Spring3D`。
-
-### 2. Spring3D 的形态：力场还是约束
-
-- `PhysicsWorld3D.StepSub` 的顺序是：`重力 → ForceFields → 积分速度 → 宽相 → 窄相 → 迭代求解 → 积分位置`，力场在积分速度**之前**应用，弹簧力能正确进入积分。
-- 采用 `Inherits ForceField3D` + 覆写 `Apply(bodies)`：实现简单、参数（k/c/restLength）语义直观、便于渲染与自检读取；显式力在高刚度下有发散风险，因此加 `MaxForce` 限幅，并给出"k/m 与子步 dt"的经验取值注释。
-- 阻尼是必需的：无阻尼的压簧会永久振荡，木板无法稳定到一个倾角。
-
-```vb
-Namespace ForceFields3D
-    ''' <summary>3D 压簧：世界锚点与刚体挂点之间的弹簧-阻尼器。</summary>
-    Public Class Spring3D : Inherits ForceField3D
-        Public Property Anchor As Vector3          ' 世界锚点（地面一侧）
-        Public Property Body As RigidBody3D        ' 受作用的刚体（木板）
-        Public Property LocalPoint As Vector3      ' 刚体局部挂点
-        Public Property Stiffness As Double        ' N/m
-        Public Property Damping As Double          ' N·s/m
-        Public Property RestLength As Double
-        Public Property MaxForce As Double         ' 限幅，防止显式力发散
-        Public ReadOnly Property CurrentLength As Double
-        Public ReadOnly Property Compression As Double   ' RestLength - CurrentLength
-        Public ReadOnly Property CurrentForce As Double
-        Public Overrides Sub Apply(bodies As IEnumerable(Of RigidBody3D))
-    End Class
-End Namespace
+### 2) 轴向软约束（Box2D distance joint 形式）
 ```
+pA, pB   : 两端世界坐标（A 为 Nothing 时 pA 就是世界锚点）
+d = pB - pA ; len = |d| ; n = d/len ; C = len - RestLength
+Cdot     : (vB + ωB×rB - vA - ωA×rA)·n
+gamma    = 1 / (dt·(Damping + dt·Stiffness))
+bias     = C · dt · Stiffness · gamma
+m_eff    = 1 / (invMassA + invMassB + n·(IA⁻¹(rA×n)×rA) + n·(IB⁻¹(rB×n)×rB) + gamma)
+lambda   = -m_eff · (Cdot + bias)      // 按 MaxForce·dt 限幅
+B 施加 +lambda·n，A 施加 -lambda·n（A 为 Nothing 时只给 B）
+```
+`Bidirectional=False` 时仅在 `C 小于 0`（压缩）才施力；本方案默认 `True`（用户已确认双向）。
 
-力的计算：`p = Body.Position + Body.Orientation.Rotate(LocalPoint)`；`delta = p - Anchor`；`dir = 归一化(delta)`；挂点速度 `v = Body.Velocity + AngularVelocity × (p - Body.Position)`；`F = (-k·(len - rest) - c·dot(v, dir))·dir`，限幅后用 `Body.ApplyForceAtPoint(p, F)`。
+### 3) 横向剪切（含死区）
+```
+lateral = d - n·(d·n) ; t1,t2 为 n 的正交基
+每个方向：C_t = lateral·t 先做死区处理（|C_t| 小于等于 ShearSlop 时视为 0，否则扣掉 ShearSlop 保号）
+参数用 ShearStiffness / ShearDamping，同样的 gamma/bias/m_eff/lambda 形式
+默认 ShearStiffness = 0.5 × Stiffness、ShearSlop = 1 mm
+```
+横向约束目标是"挂点回到锚点所在轴线"，但因为有死区且刚度只有一半，倾斜只被削弱约一半而不是锁死，正好落在 2 至 3 度。
 
-### 3. 木板为什么用四角弹簧
+### 4) 位置层修正
+`SolvePosition` 只按长度误差的 20% 沿 `n` 平移两端（按质量比分配），不做"传送式"直改，避免抖动；横向不做位置修正（交由速度层与死区）。
 
-单个中心压簧只提供轴向力，不提供恢复力矩，偏心负载时木板会一直翻到掉下来。四角弹簧时各簧压缩量不同、簧力差形成恢复力矩，木板会倾斜到一个可平衡的姿态——这正是"挪动重块能改变倾角、可以配平"的物理基础。
+### 5) 平台接线
+`SpringPlatform` 的四角弹簧从 `Spring3D` 换成 `SpringJoint3D`：
+- `A = Nothing`、`AnchorA = 地面锚点世界坐标`
+- `B = plate`、`AnchorB = 板底角点（局部坐标）`
+- `RestLength = 板底离地高度`、`Stiffness/Damping` 来自指令参数、`ShearStiffness = k×0.5`
+- 通过 `world.Add(joint)` 进入 `Constraints`（不是 `ForceFields`）
+- 删除已无用的 `CenterShear`；保留挡块作为极端过载的硬限位，保留 `PlateMesh/StopperMesh`
 
-### 4. 平台与指令
-
-- 新增 `Simulation\SpringPlatform.vb`：木板（Box 刚体）+ N 根 `Spring3D`（默认 4 角），弹簧注册进 `world.ForceFields`；提供 `PlateBody`、`Springs`、`Tilt()`（相对世界 X/Y 轴的倾角，度）、`TiltMagnitude()`。
-- 木板加入 `Simulation.Objects`（复用 `BlockInstance`），因此它自然出现在 `objects`（带 rotation，脚本可独立算倾角）、被渲染、可被 `clear`/`remove` 处理。
-- 协议新增 `CmdPlatform = "platform"`：`{size, position, stiffness, damping, springs}`，返回 `{plateId, springs:[{index, length, compression, force}]}`；`state` 增加 `platform:{plateId, tiltX, tiltY, tiltMag, springs:[...]}`。
-- `ArmSimulation` 持有 `Public Property Platform As SpringPlatform`，`Reset()/Clear` 时一并释放（从 `world.ForceFields` 移除）。
-
-### 5. 弹簧的可视化
-
-`OverlayRenderer` 新增 `ShowSprings` 与 `AddSprings(platform, anchor)`：用折线近似螺旋线圈（约 6 圈、每圈 8 段），圈高随 `Compression` 变化，颜色用 `UiTheme` 的 slate 灰阶（浅色主题）。走现有动态线通道（`EnsureLineCapacity` + `UploadLines`），不触发几何重建。注意 `PackColor()` 必须先 `CInt` 再移位（此前修过的 Byte 移位陷阱）。
-
-### 6. 脚本的闭环策略
-
-`scripts/balance_beam.js`：
-
-1. `arm.clear()` → `arm.platform({size:[0.24,0.24,0.02], position:[0.36,0,0.09], springs:4})`
-2. spawn 4 块重块（约 0.035 m、0.3 kg）摆在机械臂够得到的一排
-3. 每轮：读 `arm.state().platform` 的 `tiltX/tiltY` → 目标落点 = 板心 + 往翘起侧偏移 `clamp(gain·倾角, ±半宽·0.8)` → `moveTo`（末端朝下 ry=90）下降 → `grip` → 抬起 → 移到落点 → 下降 → `release`
-4. 四块放完后若 `tiltMag > 3°`：挑离板心最远的一块重新拾取并挪向翘起侧，最多若干轮
-5. 每轮打印倾角、落点、是否 `BALANCED`
-
-复用 `pick_and_place.js` 的成功经验：末端朝下（ry=90）、下降到"物体中心 z + 0.027"、`grip` 后等约 2.5 s（手指 25 mm/s）、抓取前先 `release()`、场景先 `clear()` 避免干扰。
-
-### 7. 稳定性与可靠性
-
-- 弹簧：刚度 2000~6000 N/m、阻尼 40~120 N·s/m、`MaxForce` 限幅；自检在 headless 下验证不发散。
-- 木板摩擦系数调高（避免重块全部滑落），质量适中（约 0.6 kg），静止高度约 0.09 m（机械臂可达且在地面网格之上）。
-- 平台是普通动态物体，不参与机械臂的地面穿透检测（`GroundViolation` 只查机械臂连杆）。
-- 自检新增"弹簧平台"段：无负载时四簧压缩量相等；加偏心重块后出现倾角且方向正确；移除后回弹；全程不发散（位置/力有限）。
+### 6) 渲染与状态
+- `OverlayRenderer.AddSprings` 改用 `joint.WorldAnchorA / joint.WorldAnchorB` 画螺旋，两端严格贴合地面与板底
+- `SpringPlatform.Compressions()/Forces()` 读 `joint.Compression / joint.CurrentForce`
+- `platform` 指令返回的 `springs[]` 保持 `compression/force/length/rest` 字段，把无意义的 `applyCount` 换成 `stiffness`
 
 ## 架构设计
-
 ```mermaid
-flowchart LR
-  Script[balance_beam.js 闭环配平] --> Host[ArmJsHost arm.*]
-  Host --> Client[ArmClient NDJSON]
-  Client --> Dispatch[CommandDispatcher]
-  Dispatch --> Platform[SpringPlatform 木板+四簧]
-  Platform --> Spring[Spring3D 力场 PhysicsEngine]
-  Spring --> World[PhysicsWorld3D]
-  World --> State[StateSnapshot.platform 倾角]
-  State --> Dispatch
-  Dispatch --> Client2[响应/状态]
-  Platform --> Render[OverlayRenderer 螺旋线]
-  State --> Script
+graph TD
+    A[PhysicsWorld3D.StepSub] --> B[力场 Apply<br/>重力等]
+    B --> C[积分速度]
+    C --> D[接触与约束迭代 x3]
+    D --> D1[ContactSolver3D]
+    D --> D2[SpringJoint3D.SolveVelocity<br/>轴向软约束 + 横向死区]
+    D --> E[积分位置]
+    E --> F[SpringJoint3D.SolvePosition<br/>20% 长度误差修正]
+    F --> G[清力]
+    G --> H[ArmSimulation.CaptureState]
+    H --> I[PlatformState<br/>tilt / compressions / forces]
+    I --> J[OverlayRenderer 螺旋线]
+    I --> K[TCP / HTTP state]
+    K --> L[balance_beam.js 倾角反馈]
 ```
 
 ## 目录结构
 
 ```
 G:\GCModeller\src\runtime\sciBASIC#\physics\Engine\
-└── ForceFields3D\
-    └── Spring3D.vb                          # [NEW] 可复用的 3D 压簧（力场）：k/c/restLength/MaxForce，暴露 CurrentLength/Compression/CurrentForce
+└── Joints3D\
+    └── SpringJoint3D.vb            # [NEW] 约束式弹簧关节
 
 G:\virtual-lab\src\VirtualWorkshop\
 ├── Simulation\
-│   ├── SpringPlatform.vb                    # [NEW] 木板 + 四角弹簧组合体；Tilt/TiltMagnitude；弹簧列表供渲染与状态使用
-│   ├── ArmSimulation.vb                     # [MODIFY] 新增 Platform 属性与 BuildPlatform(...)，Reset/Clear 时释放弹簧力场
-│   └── StateSnapshot.vb                     # [MODIFY] 新增 PlatformState{PlateId,TiltX,TiltY,TiltMagnitude,Springs[]} 并挂到 StateSnapshot
-├── Protocol\
-│   ├── ProtocolText.vb                     # [MODIFY] 新增 CmdPlatform="platform" 与相关字段常量
-│   └── CommandDispatcher.vb                 # [MODIFY] 新增 Platform(args)：创建/查询/移除弹簧平台
+│   └── SpringPlatform.vb           # [MODIFY] 四角改用 SpringJoint3D，删除 CenterShear，Springs 类型改为 List(Of SpringJoint3D)
 ├── Rendering\
-│   └── OverlayRenderer.vb                   # [MODIFY] 新增 ShowSprings 与 AddSprings（螺旋线，随压缩量伸缩）
+│   └── OverlayRenderer.vb          # [MODIFY] AddSprings 改用 WorldAnchorA/WorldAnchorB
+├── Protocol\
+│   └── CommandDispatcher.vb        # [MODIFY] springs[] 去掉 applyCount，改输出 stiffness
 └── Diagnostics\
-    └── SimSelfTest.vb                       # [MODIFY] 新增"弹簧平台"断言段
+    └── SimSelfTest.vb              # [MODIFY] 新增弹簧平台验收断言
 
 G:\virtual-lab\src\Controller\
-├── Scripting\
-│   └── ArmJsHost.vb                         # [MODIFY] 新增 platform(options) 与 tilt() 便捷读取
 └── scripts\
-    └── balance_beam.js                      # [NEW] 弹簧木板配平演示：依次放 4 块重块 + 倾角反馈闭环微调
+    └── balance_beam.js             # [MODIFY] 按新弹簧特性重调参数并跑通全流程
 ```
 
-## 关键契约
+**`Joints3D\SpringJoint3D.vb`**（新建，属 PhysicsEngine，可复用）
+- 目的：提供可在任意两个刚体（或刚体与世界锚点）之间工作的双向弹性连接
+- 功能：`A/AnchorA/B/AnchorB/RestLength/Stiffness/Damping/ShearStiffness/ShearDamping/ShearSlop/Bidirectional/MaxForce/Label`；只读 `WorldAnchorA/WorldAnchorB/CurrentLength/Compression/CurrentForce/Direction`
+- 实现要求：
+  - `SolveVelocity(dt)` 按上文柔度公式分别解轴向与两个横向方向；`A` 为 `Nothing` 时把 `invMassA`、`rA` 短路为 0，只对 B 施加冲量
+  - 冲量施加用 `ApplyImpulse(impulse, contactVector)`，`contactVector = rA/rB`
+  - `MaxForce` 兜底：`|lambda|` 不超过 `MaxForce·dt`
+  - `SolvePosition(dt)` 只做 20% 长度误差修正，横向不修正
+  - 注释里写清"为什么不能用力场、柔度公式推导、dt 量纲、死区含义"
 
-平台指令：
+**`Simulation\SpringPlatform.vb`**（改造）
+- 目的：木板与地面之间的四根弹簧改为真正的约束
+- 功能：`Springs` 类型改为 `List(Of SpringJoint3D)`；`Create` 里构造四个 `SpringJoint3D` 并 `world.Add`；`Detach` 从 `world.Constraints` 移除（同时保留挡块与网格的移除）
+- 实现要求：删除 `CenterShear` 相关字段、创建与移除逻辑；`RestLength` 仍取 `center.z - thickness/2`；`ShearStiffness = Stiffness×0.5`、`ShearDamping = Damping`、`ShearSlop = 0.001`、`Bidirectional = True`；`MaxForce` 作为兜底（如 1500）
 
-```
-{"id":1,"cmd":"platform","params":{"size":[0.24,0.24,0.02],"position":[0.36,0,0.09],
-                                    "stiffness":4000,"damping":80,"springs":4}}
-→ {"ok":true,"result":{"plateId":"block-13","size":[0.24,0.24,0.02],
-                       "springs":[{"index":0,"length":0.062,"compression":0.018,"force":72.0}, ...]}}
-```
+**`Rendering\OverlayRenderer.vb`**（改造）
+- 目的：弹簧螺旋线两端严格贴合
+- 功能：`AddSprings` 与 `AddSpringCoil` 的入参类型改为 `SpringJoint3D`，端点用 `WorldAnchorA/WorldAnchorB`
+- 实现要求：把从 `Spring3D` 取 `Anchor/AttachPoint` 的地方替换掉；螺旋圈数与半径逻辑保持不变；`TryCast` 兜底可去掉
 
-状态字段：
+**`Protocol\CommandDispatcher.vb`**（微调）
+- 目的：状态字段与新实现一致
+- 功能：`PlatformInfo` 里 `springs[]` 去掉 `applyCount`，改为 `stiffness`；`compression/force/length/rest` 保持不变
+- 实现要求：`length` 取 `joint.CurrentLength`，`rest` 取 `platform.RestLength`，不改变既有字段名以免破坏脚本
 
-```
-"platform": {"plateId":"block-13","tiltX":-2.4,"tiltY":1.1,"tiltMag":2.64,
-             "springs":[{"compression":0.018,"force":72.0}, ...]}
-```
+**`Diagnostics\SimSelfTest.vb`**（新增断言）
+- 目的：把本轮的物理指标变成可回归检查
+- 功能：新增"弹簧平台"段，用 `platform` 指令建板，按顺序验证：空载倾角小于 0.3 度且四簧压缩差小于 0.5 mm、单块 0.6 kg 偏心倾角在 2 至 4 度且压缩差大于 8 mm、四块四象限后板高大于 0.09 m、移除后 2 秒回弹、加载卸载后板心水平漂移小于 5 mm、`damping` 调到 300 不发散（位置小于 1 m）
+- 实现要求：断言用 `host.ExecuteNow(ProtocolText.CmdPlatform, ...)` 与 `host.StepFixed(n)`；读 `host.State.Platform`；每一项都给中文标题，失败时打印实测值
 
-倾斜判据：`tiltX` 为绕世界 X 轴的倾角、`tiltY` 为绕世界 Y 轴的倾角（度），`tiltMag = sqrt(tiltX² + tiltY²)`；脚本把重块放到"翘起侧"（倾角符号相反的一侧）来抵消力矩。
+**`scripts\balance_beam.js`**（参数与流程微调）
+- 目的：让演示稳定收敛
+- 功能：板 0.30×0.30×0.03 位于 (0.36, 0, 0.12)、`stiffness` 200、`damping` 60、重块 0.6 kg、四象限偏移 ±0.07；保留高位平移 0.40 与 `descendSlowly` 分段下降、`place` 释放高度 `top + FINGER_DROP + 0.005`
+- 实现要求：若新弹簧下板不再下沉，`place` 与 `pick` 的高度常量按实测重算；`BALANCED` 判据保持倾角阈值 3 度；脚本结束时打印四簧压缩量与最终倾角
+
+## 性能与可靠性
+- 每子步新增 4 次软约束求解（每约束 3 轮迭代），开销可忽略；`SpringJoint3D` 内部不分配对象，避免 GC 抖动
+- 柔度公式在 `Damping=0` 时 `gamma = 1/(dt²·Stiffness)` 仍有限，不会除零；`Stiffness=0` 时退化为纯阻尼
+- 世界锚点分支短路 `invMassA`，不会产生除零或 NaN
+- 只新增引擎文件并改四个调用点，`Spring3D.vb` 保留不动（向后兼容），不影响既有协议语义与界面布局
+
+## 风险与对策
+- **倾斜被横向刚度锁死**：横向取 0.5×轴向并加 1 mm 死区；若实测仍偏小，把 `ShearStiffness` 降到 0.3×轴向
+- **板被压到挡块**：软约束下支撑力不再依赖穿透，预期不再下沉；若仍触底则是 `Stiffness` 相对负载过小，按验收第 3 条调参
+- **约束 3 轮迭代导致冲量重复累加**：`lambda` 每轮从头计算（不做跨轮 warm starting），并在注释中说明
+- **VB 陷阱**：Module 成员不能加 `Shared`；`Byte` 移位会溢出；局部变量不能与属性或类型同名；`System.Math` 全限定
 
 
 ## Agent Extensions
-
 ### SubAgent
-
 - **code-explorer**
-- Purpose: 实现前逐字核对底层签名，避免凭记忆写错：`ForceField3D.Apply(bodies)` 的覆写签名、`RigidBody3D.ApplyForceAtPoint(worldPoint, f)` 与 `Orientation.Rotate(v)` 的确切形式、`Vector3` 的叉积/点积辅助（`Vector3Math.Cross/Dot`）、`PhysicsWorld3D.Add(ForceField3D)` 重载、`BlockInstance` 的字段构成、以及 `OverlayRenderer.AddLine` 的缓冲格式。
-- Expected outcome: 给出带文件行号的逐字签名，使 `Spring3D`、`SpringPlatform`、协议与渲染代码一次编译通过。
+  - Purpose: 在动手写 `SpringJoint3D` 前，核对 `RigidBody3D` 与 `Matrix3x3` 的确切成员（`InvInertiaWorld`、`ApplyImpulse`、`Quaternion.Rotate`）、`BallJoint3D`/`RevoluteJoint3D` 里可复用的有效质量与限幅辅助函数，以及 `PhysicsWorld3D.Constraints` 的添加与移除方式，避免凭记忆写错签名
+  - Expected outcome: 一份可直接落笔的接口清单（成员名、参数、返回类型），以及一处可参照的约束式实现样板

@@ -559,8 +559,10 @@ Namespace Protocol
                                 {"force", If(i < forces.Length, forces(i), 0.0)},
                                 {"length", length},
                                 {"rest", rest},
-                                {"applyCount", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
-                                                  platform.Springs(i).ApplyCount, 0)}
+                                {"stiffness", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                                 platform.Springs(i).Stiffness, 0.0)},
+                                {"solveCount", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                                  platform.Springs(i).SolveCount, 0)}
                             })
                         Next
 

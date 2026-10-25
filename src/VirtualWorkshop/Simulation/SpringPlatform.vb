@@ -1,6 +1,7 @@
 ﻿Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Microsoft.VisualBasic.Engine.Physics.ForceFields3D
+Imports Microsoft.VisualBasic.Engine.Physics.Joints3D
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
 
@@ -61,11 +62,15 @@ Namespace Simulation
         ''' <summary>行程限位挡块的渲染网格。</summary>
         Public Property StopperMesh As LinkMesh
 
-        ''' <summary>板心的横向约束（只防漂移、不产生力矩）。</summary>
-        Public Property CenterShear As Spring3D
-
-        ''' <summary>四根角簧。</summary>
-        Public ReadOnly Property Springs As New List(Of Spring3D)()
+        ''' <summary>
+        ''' 四根角簧（约束式关节，一端世界锚点、一端板底角点）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 早期用 <c>ForceFields3D.Spring3D</c>（显式力），刚度/阻尼稍大就发散、只能靠
+        ''' 限幅硬压，参数极其敏感。改成 <see cref="SpringJoint3D"/> 后由速度层的柔度求解，
+        ''' 大刚度也稳定，且天然双向（拉伸时也会把板拉回），木板不会"脱离"弹簧。
+        ''' </remarks>
+        Public ReadOnly Property Springs As New List(Of SpringJoint3D)()
 
         ''' <summary>弹簧在板上的挂点（板局部坐标），与 <see cref="Springs"/> 一一对应。</summary>
         Public ReadOnly Property LocalPoints As New List(Of Vector3)()
@@ -196,37 +201,26 @@ Namespace Simulation
                 Dim local As Vector3 = corners(i)
                 Dim anchor As New Vector3(center.x + local.x, center.y + local.y, 0.0)
 
-                ' 角簧只出轴向力：横向约束交给下面的中心拉簧。
-                ' 若在四角也加横向刚度，板一倾斜挂点就横向偏移、剪切力会抵消掉大部分
-                ' 负载力矩，实测倾斜角被压掉 4~20 倍（几乎看不出倾斜）。
-                Dim spring As New Spring3D(anchor, plate, local, stiffness, damping, platform.RestLength) With {
+                ' 一端固定在世界上（世界锚点），一端铰接在板底角点。
+                ' 轴向用软约束（k/c），横向用 0.5k + 1 mm 死区：
+                ' 死区让板倾斜时挂点的几毫米横向错位不产生恢复力矩，
+                ' 否则剪切刚度会把负载力矩抵掉、倾斜角被压掉一个数量级。
+                Dim spring As New SpringJoint3D(Nothing, plate, anchor, local,
+                                               platform.RestLength, stiffness, damping) With {
                     .Label = id & "-spring-" & (i + 1),
-                    .MaxForce = 1500.0,
-                    .ShearStiffness = stiffness * 1.0,
-                    .ShearDamping = damping * 2.0
+                    .MaxForce = 4000.0,
+                    .Bidirectional = True,
+                    .ShearStiffness = stiffness * 0.5,
+                    .ShearDamping = damping,
+                    .ShearSlop = 0.001
                 }
 
-                world.Add(spring)
+                Call world.Add(spring)
 
                 platform.Springs.Add(spring)
                 platform.LocalPoints.Add(local)
                 platform.Anchors.Add(anchor)
             Next
-
-            ' 中心横向约束：把板心拉回竖直轴线上，防止整块板横向漂走，
-            ' 作用点在质心所以不产生力矩，不影响倾斜灵敏度
-            Dim centerAnchor As New Vector3(center.x, center.y, System.Math.Max(0.001, center.z - thickness * 0.5))
-            Dim shear As New Spring3D(centerAnchor, plate, Vector3.Zero, 0.0, 0.0,
-                                      System.Math.Max(0.001, center.z - thickness * 0.5)) With {
-                .Label = id & "-shear",
-                .MaxForce = 400.0,
-                .ShearStiffness = 0.0,
-                .ShearDamping = damping * 0.8
-            }
-
-            world.Add(shear)
-
-            platform.CenterShear = shear
 
             Return platform
         End Function
@@ -235,15 +229,9 @@ Namespace Simulation
         Public Sub Detach(world As PhysicsWorld3D)
             If world Is Nothing Then Return
 
-            For Each spring As Spring3D In Springs
-                If world.ForceFields.Contains(spring) Then world.ForceFields.Remove(spring)
+            For Each spring As SpringJoint3D In Springs
+                If world.Constraints.Contains(spring) Then world.Constraints.Remove(spring)
             Next
-
-            If CenterShear IsNot Nothing AndAlso world.ForceFields.Contains(CenterShear) Then
-                world.ForceFields.Remove(CenterShear)
-            End If
-
-            CenterShear = Nothing
 
             If Stopper IsNot Nothing Then world.Remove(Stopper)
             If Plate IsNot Nothing Then world.Remove(Plate)

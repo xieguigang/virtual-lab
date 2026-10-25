@@ -127,18 +127,23 @@ Namespace Rendering
 
             If platform Is Nothing OrElse platform.Springs.Count = 0 Then Return
 
-            For Each spring As Microsoft.VisualBasic.Engine.Physics.ForceFields3D.Spring3D In platform.Springs
+            For Each spring As Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D In platform.Springs
                 Call AddSpringCoil(spring, anchor)
             Next
         End Sub
 
-        Private Sub AddSpringCoil(coil As Microsoft.VisualBasic.Engine.Physics.ForceFields3D.Spring3D,
+        ''' <remarks>
+        ''' 两端直接用约束给出的 <see cref="Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D.WorldAnchorA"/>
+        ''' 与 <see cref="Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D.WorldAnchorB"/>，
+        ''' 所以弹簧看起来是真的"接在"地面锚点与木板上，而不是漂在旁边。
+        ''' </remarks>
+        Private Sub AddSpringCoil(coil As Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D,
                                   anchor As Vector3)
 
             If coil Is Nothing Then Return
 
-            Dim from As Vector3 = coil.Anchor - anchor
-            Dim [to] As Vector3 = coil.AttachPoint - anchor
+            Dim from As Vector3 = coil.WorldAnchorA - anchor
+            Dim [to] As Vector3 = coil.WorldAnchorB - anchor
             Dim axis As Vector3 = [to] - from
             Dim length As Double = Vector3Math.Length(axis)
 
