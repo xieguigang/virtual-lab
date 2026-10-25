@@ -476,4 +476,7 @@ Public Class FormVirtualLab
         End Select
     End Sub
 
+    Private Sub m_jointName2_Click(sender As Object, e As EventArgs) Handles m_jointName2.Click
+
+    End Sub
 End Class
