@@ -257,7 +257,25 @@ Namespace Protocol
                 z = JsonText.Num(args, "z")
             End If
 
-            Return MotionResult(Hardware.MoveL(x, y, z, JsonText.Num(args, "speed", 0.25)))
+            Dim speed As Double = JsonText.Num(args, "speed", 0.25)
+
+            ' strict=true：每个插补点都必须同时满足位置与姿态（夹着工件搬运时用）。
+            ' 不给时保持老行为（姿态解不出就退化为位置优先）。
+            Dim strict As Boolean = JsonText.Bool(args, "strict", False)
+
+            ' 显式给 rx/ry/rz 时同时约束姿态，否则沿用"保持当前末端姿态"
+            If args.ContainsKey("rx") OrElse args.ContainsKey("ry") OrElse args.ContainsKey("rz") Then
+                Dim rpy As New Vector3(
+                    JsonText.Num(args, "rx") * System.Math.PI / 180.0,
+                    JsonText.Num(args, "ry") * System.Math.PI / 180.0,
+                    JsonText.Num(args, "rz") * System.Math.PI / 180.0)
+
+                Dim goal As New Pose3D(New Vector3(x, y, z), ArmAssembly.RpyQuaternion(rpy))
+
+                Return MotionResult(Hardware.MoveTo(goal, speed, strict))
+            End If
+
+            Return MotionResult(Hardware.MoveL(x, y, z, speed, strict))
         End Function
 
         Private Function MoveTo(args As JsonObject) As JsonObject

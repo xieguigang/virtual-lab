@@ -4,8 +4,8 @@
 // 用法: Controller.exe --js scripts/balance_beam.js
 //
 // 场景:
-//   * 地面上放一块由四角弹簧支撑的正方形木板（弹簧会画成螺旋线）
-//   * 4 块重块散落在板外侧的地面上
+//   * 地面上放一块由四角弹簧支撑的正方形木板（弹簧会画成螺旋线），在机械臂正前方
+//   * 4 块重块摆在机械臂**左侧**的地面上（与木板隔开，取件时大臂不会扫到板）
 //   * 机械臂依次把它们搬到板上；每搬一块前先读一次木板倾角，
 //     把下一块放到"翘起的一侧"，最后再做几轮微调把倾角压到阈值内
 //
@@ -14,22 +14,18 @@
 //   木板停在一个新的平衡角上；摆上重块时它会因为 tanθ > μ 而真的滑动。
 // ---------------------------------------------------------------------------
 
-// 板放在机械臂正前方、y ≈ 0 的直线上：
-// 这样 j1 几乎不转，夹爪的开合方向始终与世界 Y 轴一致，能平平地夹住方块的侧面。
-// 放在侧面（y = ±0.3）时 j1 要转 40°，手指变成"斜着夹"，方块很容易滑掉。
+// 板放在机械臂正前方（y ≈ 0），但**高度**必须明显低于"零位时手臂下沿"（约 0.142 m）：
+// 板顶高于这个值时，放件时肘部会压到板上，实测第 1 块就会把板压到行程限位。
 var PLATE_SIZE = [0.30, 0.30, 0.03];
-
-// 板放在机械臂正前方、y ≈ 0 的直线上：
-//  * y 偏 0 时 j1 几乎不转，夹爪的开合方向与世界 Y 轴一致，能平平地夹住方块侧面
-//  * 高度必须明显低于"零位时手臂下沿"（约 0.142 m），否则搬运时肘部会压到板上，
-//    实测板顶 0.128 m 时第 1 块就会把板压到行程限位
 var PLATE_POS = [0.36, 0.0, 0.09];
 var PLATE_HALF = 0.15;
 var PLATE_TOP = PLATE_SIZE[2] * 0.5;   // 板中心 → 板顶
 
-// 块取 32 mm：夹爪闭合时能夹住它的中上部
+// 块取 32 mm：夹爪闭合时能夹住它的中上部。
+// 质量上限实测约 0.4 kg —— 位置驱动夹爪的法向力有限（摩擦 μ≈0.8），
+// 0.6 kg 时抬起就会从两指之间滑落（实测 blockZ 直接掉回地面）。
 var BLOCK_SIZE = [0.032, 0.032, 0.032];
-var BLOCK_MASS = 0.60;
+var BLOCK_MASS = 0.25;
 var COLORS = ['#F59E0B', '#22D3EE', '#34D399', '#F472B6'];
 
 var FINGER_DROP = 0.027;        // 手指中心在 TCP 下方约 2.7 cm
@@ -37,13 +33,20 @@ var DOWN_RX = 0;
 var DOWN_RY = 90;
 var DOWN_RZ = 0;
 
-// 全部摆在木板范围之外（板 x ∈ [0.21, 0.51]）、贴近 y = 0 的位置：
-// 贴近 y = 0 时 j1 转角小、夹持稳；在板外则下降取件时手臂不会压到板
+// 4 块重块全部摆在机械臂**左侧**（世界 +Y 一侧），木板仍在正前方（y ≈ 0）。
+//
+// 之前把重块摆在正前方的远端（x ≈ 0.55），机械臂得完全伸出去才够得到：
+// 一是接近臂展极限，二是下降取件时大臂正好扫过木板所在的位置，会把平台压塌。
+// 挪到左侧后，取件点离木板有 0.35 m 以上，大臂完全不会碰到板。
+//
+// 取件点距基座 0.29~0.35 m、j1 转角 20°~45°。
+// 不要摆得更远（x/y 再大 0.1 m 以上）：那种位置 IK 解不出"末端朝下"的姿态，
+// 会回退成只约束位置，抬臂时姿态突变，夹着的方块被甩到 1.7 m 外。
 var PICK_SPOTS = [
-    { x: 0.55, y: -0.06 },
-    { x: 0.55, y: 0.06 },
-    { x: 0.57, y: -0.12 },
-    { x: 0.57, y: 0.12 }
+    { x: 0.20, y: 0.20 },
+    { x: 0.26, y: 0.16 },
+    { x: 0.16, y: 0.24 },
+    { x: 0.28, y: 0.10 }
 ];
 
 var BALANCED_DEG = 3.0;         // 倾角阈值
@@ -110,9 +113,42 @@ function report(label) {
 //
 // 另外 moveTo 是关节空间插值，末端走的是弧线：一次性下降 30 cm 时弧线会明显
 // 偏离竖直方向（实测把已经放到板面上的方块甩到 27 cm 外）。所以竖直段必须分段。
+// 夹着工件时的移动一律走笛卡尔直线 + 严格保持末端姿态（arm.moveLHold）。
+// 关节插值（arm.moveTo）的末端轨迹是弧线，而且低处姿态解不出来时会退化成
+// "只约束位置、姿态随动"，夹爪一转手腕，方块就被甩出一米多。
+function moveStraight(x, y, z, speed) {
+    if (isNaN(x) || isNaN(y) || isNaN(z)) {
+        console.log('   目标坐标无效 (' + x + ', ' + y + ', ' + z + ')，跳过这次移动');
+        return;
+    }
+
+    var motion = arm.moveLHold(x, y, z, speed);
+    var done = arm.waitMotion(motion.motionId, 180000);
+
+    if (!done.done || !done.success) {
+        throw new Error('直线运动未完成: ' + done.message);
+    }
+}
+
+// 空手接近/下降：关节插值更灵活（低处姿态要求苛刻时也能到达）
 function descendSlowly(x, y, fromZ, toZ, steps) {
     for (var s = 1; s <= steps; s++) {
         movePose(x, y, fromZ + (toZ - fromZ) * s / steps, 0.12);
+    }
+}
+
+// 夹着工件下降：必须走直线 + 锁定姿态
+function descendHold(x, y, fromZ, toZ, steps) {
+    for (var s = 1; s <= steps; s++) {
+        moveStraight(x, y, fromZ + (toZ - fromZ) * s / steps, 0.10);
+    }
+}
+
+// 抬起也必须分段：夹着积木时如果一次性抬 35 cm，关节插值会让末端走出弧线，
+// 手指横向运动把积木"搓"出去（实测积木飞出 5 m 远）。
+function ascendSlowly(x, y, fromZ, toZ, steps) {
+    for (var s = 1; s <= steps; s++) {
+        moveStraight(x, y, fromZ + (toZ - fromZ) * s / steps, 0.12);
     }
 }
 
@@ -120,7 +156,7 @@ function pick(px, py, pz) {
     arm.release();
     arm.sleep(600);
 
-    movePose(px, py, 0.40, 0.15);
+    movePose(px, py, 0.40, 0.08);
     descendSlowly(px, py, 0.40, pz + FINGER_DROP, 5);
     arm.grip(60);
     arm.sleep(2500);
@@ -128,21 +164,29 @@ function pick(px, py, pz) {
     var gs = arm.state().gripper;
     console.log('     夹持: contact=' + gs.contact + '  open=' + gs.opening.toFixed(3) + '  hold=' + gs.holdingId);
 
-    movePose(px, py, 0.40, 0.35);
+    ascendSlowly(px, py, pz + FINGER_DROP, 0.40, 6);
 }
 
 function place(qx, qy) {
     var t = arm.tilt();
     var top = t.height + PLATE_TOP;
 
-    // 水平移动全部在高位完成，竖直段分段下降
-    movePose(qx, qy, 0.40, 0.15);
-    descendSlowly(qx, qy, 0.40, top + FINGER_DROP + 0.005, 5);
+    // 水平移动也分段：从左侧取件点（j1≈67°）搬到正前方（j1≈14°）要转 50° 以上，
+    // 一次性关节插值会让末端走出很大的弧线，夹着的积木被甩出两米开外
+    var now = arm.state().tcp;
+    var fromX = now[0];
+    var fromY = now[1];
+
+    for (var seg = 1; seg <= 4; seg++) {
+        moveStraight(fromX + (qx - fromX) * seg / 4, fromY + (qy - fromY) * seg / 4, 0.40, 0.12);
+    }
+
+    descendHold(qx, qy, 0.40, top + FINGER_DROP + 0.02, 5);
 
     arm.release();
     arm.sleep(1500);
 
-    movePose(qx, qy, 0.42, 0.35);
+    ascendSlowly(qx, qy, top + FINGER_DROP + 0.02, 0.42, 5);
 }
 
 // 四块必须落在板上的四个不同象限：

@@ -886,11 +886,7 @@ Namespace Simulation
                 Dim pose As Pose3D = Assembly.BodyPose(poses, pair.Key)
                 Dim body As RigidBody3D = pair.Value
 
-                If stepDt > 0.0 Then
-                    body.Velocity = (pose.Position - body.Position) / stepDt
-                Else
-                    body.Velocity = Vector3.Zero
-                End If
+                body.Velocity = KinematicVelocity(body, pose, stepDt)
 
                 body.Position = pose.Position
                 body.Orientation = pose.Rotation
@@ -913,17 +909,38 @@ Namespace Simulation
                 Dim pose As New Pose3D(wristPose.Transform(local), wristPose.Rotation)
                 Dim body As RigidBody3D = FingerBodies(i)
 
-                If stepDt > 0.0 Then
-                    body.Velocity = (pose.Position - body.Position) / stepDt
-                Else
-                    body.Velocity = Vector3.Zero
-                End If
+                body.Velocity = KinematicVelocity(body, pose, stepDt)
 
                 body.Position = pose.Position
                 body.Orientation = pose.Rotation
                 body.AngularVelocity = Vector3.Zero
             Next
         End Sub
+
+        ''' <summary>
+        ''' 由位姿变化率得到 kinematic 刚体的速度，并对速度限幅。
+        ''' </summary>
+        ''' <remarks>
+        ''' 关节空间插值经过奇异点附近时，末端位姿可能在一步内跳过好几厘米，
+        ''' 直接除 dt 会得到几十 m/s 的"速度"。接触求解器会用这个速度算相对速度，
+        ''' 结果就是夹着的积木被一巴掌抽到几米之外（实测积木飞出 5.4 m）。
+        ''' 限幅到 <see cref="MaxKinematicSpeed"/> 后既能带动积木，又不会产生爆冲。
+        ''' </remarks>
+        Private Shared Function KinematicVelocity(body As RigidBody3D, pose As Pose3D, stepDt As Double) As Vector3
+            If stepDt <= 0.0 Then Return Vector3.Zero
+
+            Dim velocity As Vector3 = (pose.Position - body.Position) / stepDt
+            Dim speed As Double = Vector3Math.Length(velocity)
+
+            If speed > MaxKinematicSpeed Then
+                velocity = velocity * (MaxKinematicSpeed / speed)
+            End If
+
+            Return velocity
+        End Function
+
+        ''' <summary>kinematic 刚体写入速度时的上限（m/s）。</summary>
+        Private Const MaxKinematicSpeed As Double = 0.35
 
         ''' <summary>
         ''' 夹爪按有限速度闭合/张开。

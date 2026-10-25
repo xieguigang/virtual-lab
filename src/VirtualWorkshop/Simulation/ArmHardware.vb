@@ -302,13 +302,52 @@ Namespace Simulation
         End Function
 
         ''' <summary>笛卡尔直线运动（movel）：沿直线插补并用数值 IK 求解路点。</summary>
+        ''' <summary>
+        ''' 笛卡尔直线运动（保持当前末端姿态）。
+        ''' </summary>
+        ''' <param name="strictOrientation">
+        ''' True 时不允许"姿态随动"的回退：夹着工件搬运必须用这个模式，
+        ''' 否则 IK 在低处解不出完整位姿时会悄悄把姿态改掉，夹爪一转头工件就被甩飞。
+        ''' </param>
         Public Function MoveL(x As Double, y As Double, z As Double,
-                              Optional speed As Double = 0.25) As MotionCommand
+                              Optional speed As Double = 0.25,
+                              Optional strictOrientation As Boolean = False) As MotionCommand
 
             Dim start As Pose3D = Simulation.Assembly.TcpPose(Simulation.JointPositions())
             Dim goal As New Pose3D(New Vector3(x, y, z), start.Rotation)
 
-            Return MoveTo(goal, speed)
+            Return MoveTo(goal, speed, strictOrientation)
+        End Function
+
+        ''' <summary>
+        ''' 严格姿态的逆解：只用"位置 + 姿态"求解，失败时换种子重试，绝不退化成位置优先。
+        ''' </summary>
+        Private Function SolveStrictOrientation(goal As Pose3D, seed As Double()) As IkResult
+            Dim attempt As IkResult = Kinematics.Solve(
+                Simulation.Assembly, goal, seed,
+                positionOnly:=False, maxIterations:=120, tolerance:=0.0005)
+
+            If attempt.Success Then Return attempt
+
+            For Each candidate As Double() In AlternativeSeeds
+                Dim q As Double() = candidate
+
+                If q.Length <> Simulation.JointDefs.Count Then
+                    q = New Double(Simulation.JointDefs.Count - 1) {}
+
+                    For i As Integer = 0 To System.Math.Min(candidate.Length, q.Length) - 1
+                        q(i) = candidate(i)
+                    Next
+                End If
+
+                attempt = Kinematics.Solve(
+                    Simulation.Assembly, goal, q,
+                    positionOnly:=False, maxIterations:=120, tolerance:=0.0005)
+
+                If attempt.Success Then Return attempt
+            Next
+
+            Return attempt
         End Function
 
         ''' <summary>
@@ -347,7 +386,12 @@ Namespace Simulation
         End Function
 
         ''' <summary>笛卡尔点位运动：直线插补到目标位姿。</summary>
-        Public Function MoveTo(targetPose As Pose3D, Optional speed As Double = 0.25) As MotionCommand
+        ''' <param name="strictOrientation">
+        ''' True 时每个插补点都必须同时满足位置与姿态；解不出就整条运动失败，
+        ''' 而不是退化成"只约束位置、姿态随动"。
+        ''' </param>
+        Public Function MoveTo(targetPose As Pose3D, Optional speed As Double = 0.25,
+                               Optional strictOrientation As Boolean = False) As MotionCommand
             If State IsNot Nothing AndAlso State.Estop Then
                 Return FailedMotion(MotionKind.Pose, "急停中，需要先 reset")
             End If
@@ -371,20 +415,29 @@ Namespace Simulation
 
                 Dim goal As New Pose3D(position, rotation)
 
-                ' 先按"位置 + 姿态"求解；六轴臂在保持末端水平的情况下往往到不了桌面高度，
-                ' 这时退化为只约束位置（姿态随动），否则 moveL 会被姿态约束卡死
+                ' 先按"位置 + 姿态"求解
                 Dim ik As IkResult = Kinematics.Solve(
                     Simulation.Assembly, goal, seed,
                     positionOnly:=False, maxIterations:=80, tolerance:=0.001)
 
-                If Not ik.Success Then
+                If Not ik.Success AndAlso strictOrientation Then
+                    ' 夹着工件搬运：只能换种子重试，绝不能把姿态丢掉
+                    ik = SolveStrictOrientation(goal, seed)
+                End If
+
+                If Not ik.Success AndAlso Not strictOrientation Then
+                    ' 普通点位运动：六轴臂在保持末端水平时往往到不了桌面高度，
+                    ' 这时退化为只约束位置（姿态随动），否则 moveL 会被姿态约束卡死
                     ik = Kinematics.Solve(
                         Simulation.Assembly, goal, seed,
                         positionOnly:=True, maxIterations:=80, tolerance:=0.003)
                 End If
 
                 If Not ik.Success Then
-                    Return FailedMotion(MotionKind.Pose, $"逆解失败: {ik.Message}（误差 {ik.TotalError:F3}）")
+                    Dim hint As String = If(strictOrientation, "（严格姿态模式下不会退化为位置优先）", "")
+
+                    Return FailedMotion(MotionKind.Pose,
+                        $"逆解失败: {ik.Message}（误差 {ik.TotalError:F3}）{hint}")
                 End If
 
                 ' 笛卡尔插补会经过这些中间点，逐个检查，确保整条路径都在地面之上

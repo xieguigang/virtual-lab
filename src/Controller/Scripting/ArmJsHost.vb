@@ -81,10 +81,40 @@ Public Class ArmJsHost
         }))
     End Function
 
+    ''' <summary>
+    ''' 笛卡尔直线运动（位置直线，姿态尽量保持当前值）。
+    ''' </summary>
     Public Function moveL(x As Double, y As Double, z As Double,
                           Optional speed As Double = 0.25) As Dictionary(Of String, Object)
         Return ToDictionary(_client.Invoke("movel", New JsonObject From {
             {"x", x}, {"y", y}, {"z", z}, {"speed", speed}
+        }))
+    End Function
+
+    ''' <summary>
+    ''' 笛卡尔直线运动 + **严格保持末端姿态**（夹着工件搬运专用）。
+    ''' </summary>
+    ''' <remarks>
+    ''' 普通 <see cref="moveL"/> 在低处解不出完整位姿时会退化成"只约束位置、姿态随动"，
+    ''' 抬臂过程中夹爪会转头，方块被甩到一米之外。这个版本不会退化：
+    ''' 整条路径的每个插补点都锁定当前姿态，解不出就直接报错。
+    ''' </remarks>
+    Public Function moveLHold(x As Double, y As Double, z As Double,
+                              Optional speed As Double = 0.2) As Dictionary(Of String, Object)
+        Return ToDictionary(_client.Invoke("movel", New JsonObject From {
+            {"x", x}, {"y", y}, {"z", z}, {"speed", speed}, {"strict", True}
+        }))
+    End Function
+
+    ''' <summary>带指定姿态（角度制 rpy）的笛卡尔直线运动。</summary>
+    Public Function moveLPose(x As Double, y As Double, z As Double,
+                              rx As Double, ry As Double, rz As Double,
+                              Optional speed As Double = 0.2,
+                              Optional strict As Boolean = True) As Dictionary(Of String, Object)
+        Return ToDictionary(_client.Invoke("movel", New JsonObject From {
+            {"x", x}, {"y", y}, {"z", z},
+            {"rx", rx}, {"ry", ry}, {"rz", rz},
+            {"speed", speed}, {"strict", strict}
         }))
     End Function
 
