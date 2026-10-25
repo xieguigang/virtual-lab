@@ -89,16 +89,20 @@ Partial Class FormVirtualLab
     Private Sub InitializeComponent()
         components = New ComponentModel.Container()
         m_top = New Panel()
+        Panel1 = New Panel()
         m_btnStart = New Button()
         m_btnStopServer = New Button()
+        m_numRealtime = New NumericUpDown()
         m_btnEnable = New Button()
+        realtimeLabel = New Label()
         m_btnHome = New Button()
+        m_btnReset = New Button()
         m_btnHold = New Button()
         m_btnEstop = New Button()
-        m_btnReset = New Button()
-        realtimeLabel = New Label()
-        m_numRealtime = New NumericUpDown()
         brand = New Label()
+        tcpCard = New Panel()
+        m_lblTcp = New Label()
+        tcpCardHeader = New Label()
         m_lblService = New Label()
         m_side = New FlowLayoutPanel()
         cameraCard = New Panel()
@@ -108,6 +112,7 @@ Partial Class FormVirtualLab
         jointCard = New Panel()
         jointCardHeader = New Label()
         jointsHost = New Panel()
+        m_jointBar4 = New TrackBar()
         m_jointName0 = New Label()
         m_jointBar0 = New TrackBar()
         m_jointLabel0 = New Label()
@@ -121,22 +126,18 @@ Partial Class FormVirtualLab
         m_jointBar3 = New TrackBar()
         m_jointLabel3 = New Label()
         m_jointName4 = New Label()
-        m_jointBar4 = New TrackBar()
         m_jointLabel4 = New Label()
         m_jointName5 = New Label()
         m_jointBar5 = New TrackBar()
         m_jointLabel5 = New Label()
-        tcpCard = New Panel()
-        tcpCardHeader = New Label()
-        m_lblTcp = New Label()
         gripCard = New Panel()
-        gripCardHeader = New Label()
         gripFlow = New FlowLayoutPanel()
         m_lblGripper = New Label()
         m_btnRelease = New Button()
         m_btnGrip = New Button()
         m_numGripForce = New NumericUpDown()
         forceLabel = New Label()
+        gripCardHeader = New Label()
         objectCard = New Panel()
         objectCardHeader = New Label()
         m_lstObjects = New ListBox()
@@ -148,21 +149,21 @@ Partial Class FormVirtualLab
         m_status = New StatusStrip()
         m_statusLabel = New ToolStripStatusLabel()
         m_lblStats = New Label()
-        Panel1 = New Panel()
         m_top.SuspendLayout()
+        Panel1.SuspendLayout()
         CType(m_numRealtime, ComponentModel.ISupportInitialize).BeginInit()
+        tcpCard.SuspendLayout()
         m_side.SuspendLayout()
         cameraCard.SuspendLayout()
         CType(m_picCamera, ComponentModel.ISupportInitialize).BeginInit()
         jointCard.SuspendLayout()
         jointsHost.SuspendLayout()
+        CType(m_jointBar4, ComponentModel.ISupportInitialize).BeginInit()
         CType(m_jointBar0, ComponentModel.ISupportInitialize).BeginInit()
         CType(m_jointBar1, ComponentModel.ISupportInitialize).BeginInit()
         CType(m_jointBar2, ComponentModel.ISupportInitialize).BeginInit()
         CType(m_jointBar3, ComponentModel.ISupportInitialize).BeginInit()
-        CType(m_jointBar4, ComponentModel.ISupportInitialize).BeginInit()
         CType(m_jointBar5, ComponentModel.ISupportInitialize).BeginInit()
-        tcpCard.SuspendLayout()
         gripCard.SuspendLayout()
         gripFlow.SuspendLayout()
         CType(m_numGripForce, ComponentModel.ISupportInitialize).BeginInit()
@@ -170,7 +171,6 @@ Partial Class FormVirtualLab
         m_bottom.SuspendLayout()
         m_viewport.SuspendLayout()
         m_status.SuspendLayout()
-        Panel1.SuspendLayout()
         SuspendLayout()
         ' 
         ' m_top
@@ -186,6 +186,22 @@ Partial Class FormVirtualLab
         m_top.Padding = New Padding(12, 0, 12, 0)
         m_top.Size = New Size(1608, 97)
         m_top.TabIndex = 3
+        ' 
+        ' Panel1
+        ' 
+        Panel1.Controls.Add(m_btnStart)
+        Panel1.Controls.Add(m_btnStopServer)
+        Panel1.Controls.Add(m_numRealtime)
+        Panel1.Controls.Add(m_btnEnable)
+        Panel1.Controls.Add(realtimeLabel)
+        Panel1.Controls.Add(m_btnHome)
+        Panel1.Controls.Add(m_btnReset)
+        Panel1.Controls.Add(m_btnHold)
+        Panel1.Controls.Add(m_btnEstop)
+        Panel1.Location = New Point(196, 25)
+        Panel1.Name = "Panel1"
+        Panel1.Size = New Size(803, 45)
+        Panel1.TabIndex = 1
         ' 
         ' m_btnStart
         ' 
@@ -225,6 +241,21 @@ Partial Class FormVirtualLab
         m_btnStopServer.Text = "停止服务"
         m_btnStopServer.UseVisualStyleBackColor = False
         ' 
+        ' m_numRealtime
+        ' 
+        m_numRealtime.BackColor = Color.White
+        m_numRealtime.BorderStyle = BorderStyle.FixedSingle
+        m_numRealtime.DecimalPlaces = 1
+        m_numRealtime.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_numRealtime.Increment = New Decimal(New Integer() {5, 0, 0, 65536})
+        m_numRealtime.Location = New Point(732, 8)
+        m_numRealtime.Margin = New Padding(0, 2, 0, 0)
+        m_numRealtime.Maximum = New Decimal(New Integer() {20, 0, 0, 0})
+        m_numRealtime.Name = "m_numRealtime"
+        m_numRealtime.Size = New Size(62, 23)
+        m_numRealtime.TabIndex = 8
+        m_numRealtime.Value = New Decimal(New Integer() {1, 0, 0, 0})
+        ' 
         ' m_btnEnable
         ' 
         m_btnEnable.BackColor = Color.White
@@ -244,6 +275,17 @@ Partial Class FormVirtualLab
         m_btnEnable.Text = "伺服使能"
         m_btnEnable.UseVisualStyleBackColor = False
         ' 
+        ' realtimeLabel
+        ' 
+        realtimeLabel.AutoSize = True
+        realtimeLabel.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
+        realtimeLabel.Location = New Point(696, 12)
+        realtimeLabel.Margin = New Padding(12, 6, 4, 0)
+        realtimeLabel.Name = "realtimeLabel"
+        realtimeLabel.Size = New Size(32, 17)
+        realtimeLabel.TabIndex = 7
+        realtimeLabel.Text = "倍率"
+        ' 
         ' m_btnHome
         ' 
         m_btnHome.BackColor = Color.White
@@ -262,6 +304,25 @@ Partial Class FormVirtualLab
         m_btnHome.TabStop = False
         m_btnHome.Text = "回零"
         m_btnHome.UseVisualStyleBackColor = False
+        ' 
+        ' m_btnReset
+        ' 
+        m_btnReset.BackColor = Color.White
+        m_btnReset.Cursor = Cursors.Hand
+        m_btnReset.FlatAppearance.BorderColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnReset.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
+        m_btnReset.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
+        m_btnReset.FlatStyle = FlatStyle.Flat
+        m_btnReset.Font = New Font("Microsoft YaHei UI", 9F)
+        m_btnReset.ForeColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
+        m_btnReset.Location = New Point(588, 6)
+        m_btnReset.Margin = New Padding(4, 0, 4, 0)
+        m_btnReset.Name = "m_btnReset"
+        m_btnReset.Size = New Size(92, 30)
+        m_btnReset.TabIndex = 6
+        m_btnReset.TabStop = False
+        m_btnReset.Text = "复位场景"
+        m_btnReset.UseVisualStyleBackColor = False
         ' 
         ' m_btnHold
         ' 
@@ -301,51 +362,6 @@ Partial Class FormVirtualLab
         m_btnEstop.Text = "急停"
         m_btnEstop.UseVisualStyleBackColor = False
         ' 
-        ' m_btnReset
-        ' 
-        m_btnReset.BackColor = Color.White
-        m_btnReset.Cursor = Cursors.Hand
-        m_btnReset.FlatAppearance.BorderColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
-        m_btnReset.FlatAppearance.MouseDownBackColor = Color.FromArgb(CByte(224), CByte(242), CByte(254))
-        m_btnReset.FlatAppearance.MouseOverBackColor = Color.FromArgb(CByte(240), CByte(249), CByte(255))
-        m_btnReset.FlatStyle = FlatStyle.Flat
-        m_btnReset.Font = New Font("Microsoft YaHei UI", 9F)
-        m_btnReset.ForeColor = Color.FromArgb(CByte(245), CByte(158), CByte(11))
-        m_btnReset.Location = New Point(588, 6)
-        m_btnReset.Margin = New Padding(4, 0, 4, 0)
-        m_btnReset.Name = "m_btnReset"
-        m_btnReset.Size = New Size(92, 30)
-        m_btnReset.TabIndex = 6
-        m_btnReset.TabStop = False
-        m_btnReset.Text = "复位场景"
-        m_btnReset.UseVisualStyleBackColor = False
-        ' 
-        ' realtimeLabel
-        ' 
-        realtimeLabel.AutoSize = True
-        realtimeLabel.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
-        realtimeLabel.Location = New Point(696, 12)
-        realtimeLabel.Margin = New Padding(12, 6, 4, 0)
-        realtimeLabel.Name = "realtimeLabel"
-        realtimeLabel.Size = New Size(32, 17)
-        realtimeLabel.TabIndex = 7
-        realtimeLabel.Text = "倍率"
-        ' 
-        ' m_numRealtime
-        ' 
-        m_numRealtime.BackColor = Color.White
-        m_numRealtime.BorderStyle = BorderStyle.FixedSingle
-        m_numRealtime.DecimalPlaces = 1
-        m_numRealtime.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
-        m_numRealtime.Increment = New Decimal(New Integer() {5, 0, 0, 65536})
-        m_numRealtime.Location = New Point(732, 8)
-        m_numRealtime.Margin = New Padding(0, 2, 0, 0)
-        m_numRealtime.Maximum = New Decimal(New Integer() {20, 0, 0, 0})
-        m_numRealtime.Name = "m_numRealtime"
-        m_numRealtime.Size = New Size(62, 23)
-        m_numRealtime.TabIndex = 8
-        m_numRealtime.Value = New Decimal(New Integer() {1, 0, 0, 0})
-        ' 
         ' brand
         ' 
         brand.BackColor = Color.Transparent
@@ -357,6 +373,42 @@ Partial Class FormVirtualLab
         brand.TabIndex = 1
         brand.Text = "VIRTUAL WORKSHOP"
         brand.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' tcpCard
+        ' 
+        tcpCard.BackColor = Color.White
+        tcpCard.Controls.Add(m_lblTcp)
+        tcpCard.Controls.Add(tcpCardHeader)
+        tcpCard.Location = New Point(1020, 6)
+        tcpCard.Margin = New Padding(0, 0, 0, 8)
+        tcpCard.Name = "tcpCard"
+        tcpCard.Padding = New Padding(12, 10, 12, 10)
+        tcpCard.Size = New Size(302, 86)
+        tcpCard.TabIndex = 2
+        ' 
+        ' m_lblTcp
+        ' 
+        m_lblTcp.BackColor = Color.Transparent
+        m_lblTcp.Dock = DockStyle.Fill
+        m_lblTcp.Font = New Font("Consolas", 9F)
+        m_lblTcp.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        m_lblTcp.Location = New Point(12, 32)
+        m_lblTcp.Name = "m_lblTcp"
+        m_lblTcp.Size = New Size(278, 44)
+        m_lblTcp.TabIndex = 1
+        m_lblTcp.Text = "x 0.000  y 0.000  z 0.000" & vbCrLf & "rx 0.0  ry 0.0  rz 0.0"
+        ' 
+        ' tcpCardHeader
+        ' 
+        tcpCardHeader.BackColor = Color.Transparent
+        tcpCardHeader.Dock = DockStyle.Top
+        tcpCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        tcpCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        tcpCardHeader.Location = New Point(12, 10)
+        tcpCardHeader.Name = "tcpCardHeader"
+        tcpCardHeader.Size = New Size(278, 22)
+        tcpCardHeader.TabIndex = 0
+        tcpCardHeader.Text = "TCP 位姿"
         ' 
         ' m_lblService
         ' 
@@ -398,7 +450,7 @@ Partial Class FormVirtualLab
         cameraCard.Margin = New Padding(0, 0, 0, 8)
         cameraCard.Name = "cameraCard"
         cameraCard.Padding = New Padding(12, 10, 12, 10)
-        cameraCard.Size = New Size(352, 200)
+        cameraCard.Size = New Size(352, 210)
         cameraCard.TabIndex = 0
         ' 
         ' cameraCardHeader
@@ -434,7 +486,7 @@ Partial Class FormVirtualLab
         m_lblCamera.ForeColor = Color.FromArgb(CByte(71), CByte(85), CByte(105))
         m_lblCamera.Location = New Point(12, 173)
         m_lblCamera.Name = "m_lblCamera"
-        m_lblCamera.Size = New Size(328, 16)
+        m_lblCamera.Size = New Size(328, 37)
         m_lblCamera.TabIndex = 2
         m_lblCamera.Text = "等待相机第一帧…"
         m_lblCamera.TextAlign = ContentAlignment.MiddleLeft
@@ -444,7 +496,7 @@ Partial Class FormVirtualLab
         jointCard.BackColor = Color.White
         jointCard.Controls.Add(jointCardHeader)
         jointCard.Controls.Add(jointsHost)
-        jointCard.Location = New Point(8, 216)
+        jointCard.Location = New Point(8, 226)
         jointCard.Margin = New Padding(0, 0, 0, 8)
         jointCard.Name = "jointCard"
         jointCard.Padding = New Padding(12, 10, 12, 10)
@@ -491,6 +543,18 @@ Partial Class FormVirtualLab
         jointsHost.Padding = New Padding(0, 4, 0, 0)
         jointsHost.Size = New Size(328, 318)
         jointsHost.TabIndex = 1
+        ' 
+        ' m_jointBar4
+        ' 
+        m_jointBar4.LargeChange = 50
+        m_jointBar4.Location = New Point(54, 205)
+        m_jointBar4.Maximum = 1000
+        m_jointBar4.Minimum = -1000
+        m_jointBar4.Name = "m_jointBar4"
+        m_jointBar4.Size = New Size(219, 45)
+        m_jointBar4.SmallChange = 5
+        m_jointBar4.TabIndex = 13
+        m_jointBar4.TickStyle = TickStyle.None
         ' 
         ' m_jointName0
         ' 
@@ -643,18 +707,6 @@ Partial Class FormVirtualLab
         m_jointName4.TabIndex = 12
         m_jointName4.Text = "J5 腕摆"
         ' 
-        ' m_jointBar4
-        ' 
-        m_jointBar4.LargeChange = 50
-        m_jointBar4.Location = New Point(54, 205)
-        m_jointBar4.Maximum = 1000
-        m_jointBar4.Minimum = -1000
-        m_jointBar4.Name = "m_jointBar4"
-        m_jointBar4.Size = New Size(219, 45)
-        m_jointBar4.SmallChange = 5
-        m_jointBar4.TabIndex = 13
-        m_jointBar4.TickStyle = TickStyle.None
-        ' 
         ' m_jointLabel4
         ' 
         m_jointLabel4.BackColor = Color.Transparent
@@ -702,65 +754,17 @@ Partial Class FormVirtualLab
         m_jointLabel5.Text = "0.000"
         m_jointLabel5.TextAlign = ContentAlignment.MiddleRight
         ' 
-        ' tcpCard
-        ' 
-        tcpCard.BackColor = Color.White
-        tcpCard.Controls.Add(m_lblTcp)
-        tcpCard.Controls.Add(tcpCardHeader)
-        tcpCard.Location = New Point(1020, 6)
-        tcpCard.Margin = New Padding(0, 0, 0, 8)
-        tcpCard.Name = "tcpCard"
-        tcpCard.Padding = New Padding(12, 10, 12, 10)
-        tcpCard.Size = New Size(302, 86)
-        tcpCard.TabIndex = 2
-        ' 
-        ' tcpCardHeader
-        ' 
-        tcpCardHeader.BackColor = Color.Transparent
-        tcpCardHeader.Dock = DockStyle.Top
-        tcpCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
-        tcpCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
-        tcpCardHeader.Location = New Point(12, 10)
-        tcpCardHeader.Name = "tcpCardHeader"
-        tcpCardHeader.Size = New Size(278, 22)
-        tcpCardHeader.TabIndex = 0
-        tcpCardHeader.Text = "TCP 位姿"
-        ' 
-        ' m_lblTcp
-        ' 
-        m_lblTcp.BackColor = Color.Transparent
-        m_lblTcp.Dock = DockStyle.Fill
-        m_lblTcp.Font = New Font("Consolas", 9F)
-        m_lblTcp.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
-        m_lblTcp.Location = New Point(12, 32)
-        m_lblTcp.Name = "m_lblTcp"
-        m_lblTcp.Size = New Size(278, 44)
-        m_lblTcp.TabIndex = 1
-        m_lblTcp.Text = "x 0.000  y 0.000  z 0.000" & vbCrLf & "rx 0.0  ry 0.0  rz 0.0"
-        ' 
         ' gripCard
         ' 
         gripCard.BackColor = Color.White
         gripCard.Controls.Add(gripFlow)
         gripCard.Controls.Add(gripCardHeader)
-        gripCard.Location = New Point(8, 562)
+        gripCard.Location = New Point(8, 572)
         gripCard.Margin = New Padding(0, 0, 0, 8)
         gripCard.Name = "gripCard"
         gripCard.Padding = New Padding(12, 10, 12, 10)
         gripCard.Size = New Size(352, 116)
         gripCard.TabIndex = 3
-        ' 
-        ' gripCardHeader
-        ' 
-        gripCardHeader.BackColor = Color.Transparent
-        gripCardHeader.Dock = DockStyle.Top
-        gripCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
-        gripCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
-        gripCardHeader.Location = New Point(12, 10)
-        gripCardHeader.Name = "gripCardHeader"
-        gripCardHeader.Size = New Size(328, 22)
-        gripCardHeader.TabIndex = 0
-        gripCardHeader.Text = "夹爪"
         ' 
         ' gripFlow
         ' 
@@ -852,12 +856,24 @@ Partial Class FormVirtualLab
         forceLabel.TabIndex = 4
         forceLabel.Text = "N"
         ' 
+        ' gripCardHeader
+        ' 
+        gripCardHeader.BackColor = Color.Transparent
+        gripCardHeader.Dock = DockStyle.Top
+        gripCardHeader.Font = New Font("Microsoft YaHei UI", 10F, FontStyle.Bold)
+        gripCardHeader.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
+        gripCardHeader.Location = New Point(12, 10)
+        gripCardHeader.Name = "gripCardHeader"
+        gripCardHeader.Size = New Size(328, 22)
+        gripCardHeader.TabIndex = 0
+        gripCardHeader.Text = "夹爪"
+        ' 
         ' objectCard
         ' 
         objectCard.BackColor = Color.White
-        objectCard.Controls.Add(objectCardHeader)
         objectCard.Controls.Add(m_lstObjects)
-        objectCard.Location = New Point(8, 686)
+        objectCard.Controls.Add(objectCardHeader)
+        objectCard.Location = New Point(8, 696)
         objectCard.Margin = New Padding(0, 0, 0, 8)
         objectCard.Name = "objectCard"
         objectCard.Padding = New Padding(12, 10, 12, 10)
@@ -884,9 +900,9 @@ Partial Class FormVirtualLab
         m_lstObjects.Font = New Font("Consolas", 8F)
         m_lstObjects.ForeColor = Color.FromArgb(CByte(30), CByte(41), CByte(59))
         m_lstObjects.IntegralHeight = False
-        m_lstObjects.Location = New Point(12, 10)
+        m_lstObjects.Location = New Point(12, 32)
         m_lstObjects.Name = "m_lstObjects"
-        m_lstObjects.Size = New Size(328, 104)
+        m_lstObjects.Size = New Size(328, 82)
         m_lstObjects.TabIndex = 1
         ' 
         ' m_bottom
@@ -957,7 +973,7 @@ Partial Class FormVirtualLab
         ' m_statusLabel
         ' 
         m_statusLabel.Name = "m_statusLabel"
-        m_statusLabel.Size = New Size(1569, 17)
+        m_statusLabel.Size = New Size(1593, 17)
         m_statusLabel.Spring = True
         m_statusLabel.Text = "就绪"
         m_statusLabel.TextAlign = ContentAlignment.MiddleLeft
@@ -972,22 +988,6 @@ Partial Class FormVirtualLab
         m_lblStats.Size = New Size(100, 23)
         m_lblStats.TabIndex = 0
         m_lblStats.Text = "FPS 0 · 步/秒 0 · 三角面 0"
-        ' 
-        ' Panel1
-        ' 
-        Panel1.Controls.Add(m_btnStart)
-        Panel1.Controls.Add(m_btnStopServer)
-        Panel1.Controls.Add(m_numRealtime)
-        Panel1.Controls.Add(m_btnEnable)
-        Panel1.Controls.Add(realtimeLabel)
-        Panel1.Controls.Add(m_btnHome)
-        Panel1.Controls.Add(m_btnReset)
-        Panel1.Controls.Add(m_btnHold)
-        Panel1.Controls.Add(m_btnEstop)
-        Panel1.Location = New Point(196, 25)
-        Panel1.Name = "Panel1"
-        Panel1.Size = New Size(803, 45)
-        Panel1.TabIndex = 1
         ' 
         ' FormVirtualLab
         ' 
@@ -1007,20 +1007,22 @@ Partial Class FormVirtualLab
         Name = "FormVirtualLab"
         Text = "VirtualWorkshop · 六轴机械臂虚拟硬件仿真工作台"
         m_top.ResumeLayout(False)
+        Panel1.ResumeLayout(False)
+        Panel1.PerformLayout()
         CType(m_numRealtime, ComponentModel.ISupportInitialize).EndInit()
+        tcpCard.ResumeLayout(False)
         m_side.ResumeLayout(False)
         cameraCard.ResumeLayout(False)
         CType(m_picCamera, ComponentModel.ISupportInitialize).EndInit()
         jointCard.ResumeLayout(False)
         jointsHost.ResumeLayout(False)
         jointsHost.PerformLayout()
+        CType(m_jointBar4, ComponentModel.ISupportInitialize).EndInit()
         CType(m_jointBar0, ComponentModel.ISupportInitialize).EndInit()
         CType(m_jointBar1, ComponentModel.ISupportInitialize).EndInit()
         CType(m_jointBar2, ComponentModel.ISupportInitialize).EndInit()
         CType(m_jointBar3, ComponentModel.ISupportInitialize).EndInit()
-        CType(m_jointBar4, ComponentModel.ISupportInitialize).EndInit()
         CType(m_jointBar5, ComponentModel.ISupportInitialize).EndInit()
-        tcpCard.ResumeLayout(False)
         gripCard.ResumeLayout(False)
         gripFlow.ResumeLayout(False)
         gripFlow.PerformLayout()
@@ -1030,8 +1032,6 @@ Partial Class FormVirtualLab
         m_viewport.ResumeLayout(False)
         m_status.ResumeLayout(False)
         m_status.PerformLayout()
-        Panel1.ResumeLayout(False)
-        Panel1.PerformLayout()
         ResumeLayout(False)
         PerformLayout()
     End Sub
