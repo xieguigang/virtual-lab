@@ -1,4 +1,4 @@
-Imports System.Text.Json.Nodes
+﻿Imports System.Text.Json.Nodes
 Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
 Imports VirtualWorkshop.Model
@@ -562,7 +562,23 @@ Namespace Protocol
                                 {"stiffness", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
                                                  platform.Springs(i).Stiffness, 0.0)},
                                 {"solveCount", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
-                                                  platform.Springs(i).SolveCount, 0)}
+                                                  platform.Springs(i).SolveCount, 0)},
+                                {"attachZ", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                               platform.Springs(i).WorldAnchorB.z, 0.0)},
+                                {"anchorZ", If(platform IsNot Nothing AndAlso i < platform.Springs.Count,
+                                               platform.Springs(i).WorldAnchorA.z, 0.0)},
+                                {"plateZ", If(platform IsNot Nothing AndAlso platform.Plate IsNot Nothing,
+                                              platform.Plate.Position.z, 0.0)},
+                                {"isStatic", If(platform IsNot Nothing AndAlso platform.Plate IsNot Nothing,
+                                                platform.Plate.IsStatic, False)},
+                                {"isSleeping", If(platform IsNot Nothing AndAlso platform.Plate IsNot Nothing,
+                                                  platform.Plate.IsSleeping, False)},
+                                {"dbgMass", If(platform IsNot Nothing AndAlso i < platform.Springs.Count, platform.Springs(i).LastMass, 0.0)},
+                                {"dbgBias", If(platform IsNot Nothing AndAlso i < platform.Springs.Count, platform.Springs(i).LastBias, 0.0)},
+                                {"dbgImpulse", If(platform IsNot Nothing AndAlso i < platform.Springs.Count, platform.Springs(i).LastImpulse, 0.0)},
+                                {"dbgGamma", If(platform IsNot Nothing AndAlso i < platform.Springs.Count, platform.Springs(i).LastGamma, 0.0)},
+                                {"mass", If(platform IsNot Nothing AndAlso platform.Plate IsNot Nothing,
+                                            platform.Plate.Mass, 0.0)}
                             })
                         Next
 
