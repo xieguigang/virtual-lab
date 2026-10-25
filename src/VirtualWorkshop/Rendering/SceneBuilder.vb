@@ -40,6 +40,7 @@ Namespace Rendering
             Call AppendArm(simulation, anchor, faces)
             Call AppendFingers(simulation, anchor, faces)
             Call AppendObjects(simulation, anchor, faces)
+            Call AppendPlatform(simulation, anchor, faces)
 
             TriangleCount = faces.Count
             LastBuildMs = _watch.Elapsed.TotalMilliseconds
@@ -77,6 +78,29 @@ Namespace Rendering
 
                 Call AppendMesh(item.Render, item.Body.Position, item.Body.Orientation, Vector3.Zero, anchor, faces)
             Next
+        End Sub
+
+        ''' <summary>
+        ''' 弹簧木板平台：木板与行程限位挡块。
+        ''' </summary>
+        ''' <remarks>
+        ''' 这两块是直接 <c>world.Add</c> 的刚体，不在 <see cref="ArmSimulation.Objects"/> 里，
+        ''' 所以要单独渲染；网格以刚体质心为原点，<c>origin</c> 传 <see cref="Vector3.Zero"/>。
+        ''' </remarks>
+        Private Sub AppendPlatform(simulation As ArmSimulation, anchor As Vector3, faces As List(Of Surface))
+            Dim platform As SpringPlatform = simulation.Platform
+
+            If platform Is Nothing Then Return
+
+            If platform.PlateMesh IsNot Nothing AndAlso platform.Plate IsNot Nothing Then
+                Call AppendMesh(platform.PlateMesh, platform.Plate.Position, platform.Plate.Orientation,
+                                Vector3.Zero, anchor, faces)
+            End If
+
+            If platform.StopperMesh IsNot Nothing AndAlso platform.Stopper IsNot Nothing Then
+                Call AppendMesh(platform.StopperMesh, platform.Stopper.Position, platform.Stopper.Orientation,
+                                Vector3.Zero, anchor, faces)
+            End If
         End Sub
 
         ''' <summary>某个 link 上挂的全部网格（Camera / Finger 等子节点会属于同一个 link）。</summary>

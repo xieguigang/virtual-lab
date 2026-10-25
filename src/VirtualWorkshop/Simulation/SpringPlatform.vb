@@ -1,6 +1,8 @@
-Imports Microsoft.VisualBasic.Engine.Physics
+﻿Imports Microsoft.VisualBasic.Engine.Physics
+Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Microsoft.VisualBasic.Engine.Physics.ForceFields3D
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports VirtualWorkshop.Model
 
 Namespace Simulation
 
@@ -52,6 +54,15 @@ Namespace Simulation
         ''' 又不会影响板向上回弹。
         ''' </remarks>
         Public Property Stopper As RigidBody3D
+
+        ''' <summary>木板的渲染网格（板是直接建在世界里的刚体，不在 Objects 列表里，必须自己带网格）。</summary>
+        Public Property PlateMesh As LinkMesh
+
+        ''' <summary>行程限位挡块的渲染网格。</summary>
+        Public Property StopperMesh As LinkMesh
+
+        ''' <summary>板心的横向约束（只防漂移、不产生力矩）。</summary>
+        Public Property CenterShear As Spring3D
 
         ''' <summary>四根角簧。</summary>
         Public ReadOnly Property Springs As New List(Of Spring3D)()
@@ -142,8 +153,8 @@ Namespace Simulation
 
             ' 行程限位：板下方一个小的静态挡块（中心 0.02 m 高，顶面 0.03 m）
             Dim stopper As RigidBody3D = PhysicsWorld3D.StaticBox(
-                width * 0.45, depth * 0.45, 0.02,
-                New Vector3(center.x, center.y, 0.02),
+                width * 0.45, depth * 0.45, 0.06,
+                New Vector3(center.x, center.y, 0.03),
                 New PhysicsMaterial(0.9, 0.0))
 
             stopper.Label = id & "-stopper"
@@ -151,6 +162,8 @@ Namespace Simulation
             stopper.CollisionMask = BlockFactory.MaskEnvironment
             world.Add(stopper)
 
+            ' 板与挡块都是直接建在世界里的刚体，不在 Objects 列表里，
+            ' 所以必须自己带上渲染网格，否则视口里只能看到弹簧、看不到木板
             Dim platform As New SpringPlatform With {
                 .Stopper = stopper,
                 .Plate = plate,
@@ -158,6 +171,10 @@ Namespace Simulation
                 .Size = New Vector3(width, depth, thickness),
                 .Stiffness = stiffness,
                 .Damping = damping,
+                .PlateMesh = Model.MeshTessellator.ToLinkMesh(
+                    ConvexMesh3D.CreateBox(width, depth, thickness), "#C99A5B", id),
+                .StopperMesh = Model.MeshTessellator.ToLinkMesh(
+                    ConvexMesh3D.CreateBox(width * 0.45, depth * 0.45, 0.06), "#6B7280", id & "-stopper"),
                 .RestLength = If(restLength > 0.0, restLength, System.Math.Max(0.02, center.z - thickness * 0.5))
             }
 
@@ -178,11 +195,14 @@ Namespace Simulation
             For i As Integer = 0 To corners.Length - 1
                 Dim local As Vector3 = corners(i)
                 Dim anchor As New Vector3(center.x + local.x, center.y + local.y, 0.0)
-                ' 横向刚度远大于轴向：压簧很难被剪动，但也别太硬（否则接触求解会抖）
+
+                ' 角簧只出轴向力：横向约束交给下面的中心拉簧。
+                ' 若在四角也加横向刚度，板一倾斜挂点就横向偏移、剪切力会抵消掉大部分
+                ' 负载力矩，实测倾斜角被压掉 4~20 倍（几乎看不出倾斜）。
                 Dim spring As New Spring3D(anchor, plate, local, stiffness, damping, platform.RestLength) With {
                     .Label = id & "-spring-" & (i + 1),
                     .MaxForce = 1500.0,
-                    .ShearStiffness = stiffness * 4.0,
+                    .ShearStiffness = stiffness * 1.0,
                     .ShearDamping = damping * 2.0
                 }
 
@@ -192,6 +212,21 @@ Namespace Simulation
                 platform.LocalPoints.Add(local)
                 platform.Anchors.Add(anchor)
             Next
+
+            ' 中心横向约束：把板心拉回竖直轴线上，防止整块板横向漂走，
+            ' 作用点在质心所以不产生力矩，不影响倾斜灵敏度
+            Dim centerAnchor As New Vector3(center.x, center.y, System.Math.Max(0.001, center.z - thickness * 0.5))
+            Dim shear As New Spring3D(centerAnchor, plate, Vector3.Zero, 0.0, 0.0,
+                                      System.Math.Max(0.001, center.z - thickness * 0.5)) With {
+                .Label = id & "-shear",
+                .MaxForce = 400.0,
+                .ShearStiffness = 0.0,
+                .ShearDamping = damping * 0.8
+            }
+
+            world.Add(shear)
+
+            platform.CenterShear = shear
 
             Return platform
         End Function
@@ -203,6 +238,12 @@ Namespace Simulation
             For Each spring As Spring3D In Springs
                 If world.ForceFields.Contains(spring) Then world.ForceFields.Remove(spring)
             Next
+
+            If CenterShear IsNot Nothing AndAlso world.ForceFields.Contains(CenterShear) Then
+                world.ForceFields.Remove(CenterShear)
+            End If
+
+            CenterShear = Nothing
 
             If Stopper IsNot Nothing Then world.Remove(Stopper)
             If Plate IsNot Nothing Then world.Remove(Plate)

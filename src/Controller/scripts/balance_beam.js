@@ -18,13 +18,18 @@
 // 这样 j1 几乎不转，夹爪的开合方向始终与世界 Y 轴一致，能平平地夹住方块的侧面。
 // 放在侧面（y = ±0.3）时 j1 要转 40°，手指变成"斜着夹"，方块很容易滑掉。
 var PLATE_SIZE = [0.30, 0.30, 0.03];
-var PLATE_POS = [0.36, 0.0, 0.12];
+
+// 板放在机械臂正前方、y ≈ 0 的直线上：
+//  * y 偏 0 时 j1 几乎不转，夹爪的开合方向与世界 Y 轴一致，能平平地夹住方块侧面
+//  * 高度必须明显低于"零位时手臂下沿"（约 0.142 m），否则搬运时肘部会压到板上，
+//    实测板顶 0.128 m 时第 1 块就会把板压到行程限位
+var PLATE_POS = [0.36, 0.0, 0.09];
 var PLATE_HALF = 0.15;
-var PLATE_TOP = 0.015;          // 板中心 → 板顶
+var PLATE_TOP = PLATE_SIZE[2] * 0.5;   // 板中心 → 板顶
 
 // 块取 32 mm：夹爪闭合时能夹住它的中上部
 var BLOCK_SIZE = [0.032, 0.032, 0.032];
-var BLOCK_MASS = 0.35;
+var BLOCK_MASS = 0.60;
 var COLORS = ['#F59E0B', '#22D3EE', '#34D399', '#F472B6'];
 
 var FINGER_DROP = 0.027;        // 手指中心在 TCP 下方约 2.7 cm
@@ -32,12 +37,13 @@ var DOWN_RX = 0;
 var DOWN_RY = 90;
 var DOWN_RZ = 0;
 
-// 都摆在板外侧、贴近 y = 0 的位置（j1 转角小，夹持稳）
+// 全部摆在木板范围之外（板 x ∈ [0.21, 0.51]）、贴近 y = 0 的位置：
+// 贴近 y = 0 时 j1 转角小、夹持稳；在板外则下降取件时手臂不会压到板
 var PICK_SPOTS = [
     { x: 0.55, y: -0.06 },
     { x: 0.55, y: 0.06 },
-    { x: 0.49, y: -0.12 },
-    { x: 0.49, y: 0.12 }
+    { x: 0.57, y: -0.12 },
+    { x: 0.57, y: 0.12 }
 ];
 
 var BALANCED_DEG = 3.0;         // 倾角阈值
@@ -61,7 +67,7 @@ function movePose(x, y, z, speed) {
     var done = arm.waitMotion(motion.motionId, 180000);
 
     if (!done.done || !done.success) {
-        console.log('   运动未完成: ' + done.message);
+        throw new Error('运动未完成: ' + done.message);
     }
 }
 
@@ -98,36 +104,64 @@ function report(label) {
     return t;
 }
 
+// 高位是 0.40~0.45：水平平移必须发生在高位。
+// 手臂的肘部在"肩—腕"之间，只要腕部（TCP）高于板面，肘部就一定更高；
+// 反过来，若在板面高度附近做水平平移，肘部会直接扫过木板、把它压到行程限位。
+//
+// 另外 moveTo 是关节空间插值，末端走的是弧线：一次性下降 30 cm 时弧线会明显
+// 偏离竖直方向（实测把已经放到板面上的方块甩到 27 cm 外）。所以竖直段必须分段。
+function descendSlowly(x, y, fromZ, toZ, steps) {
+    for (var s = 1; s <= steps; s++) {
+        movePose(x, y, fromZ + (toZ - fromZ) * s / steps, 0.12);
+    }
+}
+
 function pick(px, py, pz) {
     arm.release();
     arm.sleep(600);
 
-    movePose(px, py, 0.26, 0.7);
-    movePose(px, py, pz + FINGER_DROP, 0.06);
+    movePose(px, py, 0.40, 0.15);
+    descendSlowly(px, py, 0.40, pz + FINGER_DROP, 5);
     arm.grip(60);
     arm.sleep(2500);
-    movePose(px, py, 0.27, 0.35);
+
+    var gs = arm.state().gripper;
+    console.log('     夹持: contact=' + gs.contact + '  open=' + gs.opening.toFixed(3) + '  hold=' + gs.holdingId);
+
+    movePose(px, py, 0.40, 0.35);
 }
 
 function place(qx, qy) {
     var t = arm.tilt();
     var top = t.height + PLATE_TOP;
 
-    movePose(qx, qy, top + 0.16, 0.5);
-    movePose(qx, qy, top + FINGER_DROP + 0.03, 0.08);
+    // 水平移动全部在高位完成，竖直段分段下降
+    movePose(qx, qy, 0.40, 0.15);
+    descendSlowly(qx, qy, 0.40, top + FINGER_DROP + 0.005, 5);
 
     arm.release();
-    arm.sleep(800);
+    arm.sleep(1500);
 
-    movePose(qx, qy, top + 0.18, 0.4);
+    movePose(qx, qy, 0.42, 0.35);
 }
 
+// 四块必须落在板上的四个不同象限：
+// 若都放中心，第二块会直接插进第一块里（穿透 → 巨大冲量 → 板被压到行程限位），
+// 这也是之前"第 1 块正常、第 2 块就崩"的真正原因。
+var SLOTS = [
+    { x: -0.07, y: -0.07 },
+    { x: 0.07, y: 0.07 },
+    { x: -0.07, y: 0.07 },
+    { x: 0.07, y: -0.07 }
+];
+
 function dropPoint(tilt, index) {
-    if (index === 0) return { x: 0, y: 0 };
+    var slot = SLOTS[index % SLOTS.length];
+    var gain = index === 0 ? 0.0 : GAIN;
 
     return {
-        x: clamp(tilt.tiltY * GAIN, -0.10, 0.10),
-        y: clamp(-tilt.tiltX * GAIN, -0.10, 0.10)
+        x: slot.x + clamp(tilt.tiltY * gain, -0.05, 0.05),
+        y: slot.y + clamp(-tilt.tiltX * gain, -0.05, 0.05)
     };
 }
 
@@ -144,8 +178,8 @@ console.log('1) 搭建四角弹簧木板');
 var plate = arm.platform({
     size: PLATE_SIZE,
     position: PLATE_POS,
-    stiffness: 400,
-    damping: 100
+    stiffness: 200,
+    damping: 60
 });
 
 console.log('   木板 ' + plate.plateId + '  弹簧 ' + plate.springs.length + ' 根');
@@ -175,7 +209,7 @@ for (var n = 0; n < 4; n++) {
     var offset = dropPoint(before, n);
 
     console.log('--- 第 ' + (n + 1) + ' 块 ' + info.id + ' ---');
-    console.log('   拾取点 (' + at[0].toFixed(3) + ', ' + at[1].toFixed(3) + ')');
+    console.log('   拾取点 (' + at[0].toFixed(3) + ', ' + at[1].toFixed(3) + ')  z=' + at[2].toFixed(3));
 
     pick(at[0], at[1], at[2]);
 
@@ -188,6 +222,9 @@ for (var n = 0; n < 4; n++) {
     place(targetX, targetY);
     arm.sleep(900);
     report('   放置后:');
+
+    var landed = arm.objects()[n];
+    console.log('     块落点 ' + JSON.stringify(landed.position));
 }
 
 console.log('4) 倾角微调');

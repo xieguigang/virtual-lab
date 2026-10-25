@@ -1,4 +1,4 @@
-Imports Microsoft.VisualBasic.Engine.Physics
+﻿Imports Microsoft.VisualBasic.Engine.Physics
 Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Microsoft.VisualBasic.Engine.Physics.Joints3D
 Imports Microsoft.VisualBasic.Engine.Physics.Math3D
@@ -180,7 +180,7 @@ Namespace Simulation
         ''' 只要超过 <c>Slop</c>(2 mm)，接触求解器就会产生法向冲量与摩擦；取 4 mm 既能夹住
         ''' 32 mm 的积木，又不会让 Baumgarte 偏置速度大到把积木弹飞。
         ''' </remarks>
-        Private Const MaxFingerSqueeze As Double = 0.0035
+        Private Const MaxFingerSqueeze As Double = 0.003
 
         ''' <summary>手指是否已经压到了物体（用的是上一步的接触信息）。</summary>
         Private _fingerContact As Boolean
@@ -736,24 +736,35 @@ Namespace Simulation
         End Sub
 
         ''' <summary>
-        ''' 几何判定：哪块物体的包围盒同时碰到某根手指（没有则返回 <c>Nothing</c>）。
+        ''' 判断夹爪是否已经夹住某块物体（返回物体 id，没有则 <c>Nothing</c>）。
         ''' </summary>
         ''' <remarks>
+        ''' <para>
         ''' 不能只依赖物理引擎的接触流形：手指是静态刚体，闭合过程中实测常常不生成
         ''' <c>Manifold3D</c>，于是"夹紧"永远检测不到接触、手指一直闭合到互相穿透，
-        ''' 把积木顶飞。包围盒相交是保守判定，宁可早一点夹住。
+        ''' 把积木顶飞。
+        ''' </para>
+        ''' <para>
+        ''' 也不能用包围盒相交：手指张开时（内间距 96 mm）两指虽然没碰到物体，
+        ''' 旋转后的 AABB 仍可能压到它，导致"一上来就算夹住"——闭合动作被立刻限死，
+        ''' 手指停在 75 mm 的开度上根本夹不起来（这个 bug 曾让整个配平脚本空手搬运）。
+        ''' 这里改用开度判据：<b>内间距已经缩到物体最小边长附近才算夹住</b>。
+        ''' </para>
         ''' </remarks>
         Public Function FingersTouchingObject() As String
             If FingerBodies.Count = 0 Then Return Nothing
 
+            Dim gap As Double = GripperOpening
+
             For Each item As BlockInstance In Objects
-                If item.Body Is Nothing Then Continue For
+                If item.Body Is Nothing OrElse item.Size Is Nothing Then Continue For
 
-                Dim target As AABB3D = item.Body.GetAABB()
+                Dim smallest As Double = System.Math.Min(item.Size.x,
+                                           System.Math.Min(item.Size.y, item.Size.z))
 
-                For Each finger As RigidBody3D In FingerBodies
-                    If finger.GetAABB().Overlaps(target) Then Return item.Id
-                Next
+                ' 只留 1 mm 余量：余量给大了会"过早"判定接触，挤压量被清零，
+                ' 手指只是轻轻贴住物体、夹持力不足，一抬就滑落
+                If gap <= smallest Then Return item.Id
             Next
 
             Return Nothing
