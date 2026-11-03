@@ -111,6 +111,9 @@ Module Program
 
         Dim spec As MjSpec = MjcfParser.Parse(modelPath)
 
+        ' 与 MicroduckLab.MjSceneOptions 的默认值保持一致
+        spec.Opt.iterations = 100
+
         ' MJCF 里写的是 meshdir="assets"，真实目录是 meshes
         spec.MeshResolver = Function(file As String) Path.Combine(m_robot, "meshes", file)
 

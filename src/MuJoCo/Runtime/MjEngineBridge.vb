@@ -49,7 +49,7 @@ Public Class MjEngineBridge
     ''' 挂在五节细长连杆的末端，5 ms 一个子步时接触冲量来不及在 100 次迭代内
     ''' 与 14 个铰链约束达成一致，脚会"跟着躯干一起滑"（μ 抬到 3 也拦不住）。
     ''' </remarks>
-    Public Shared Property PhysicsSubsteps As Integer = 4
+    Public Shared Property PhysicsSubsteps As Integer = 8
 
     ''' <summary>允许的穿透量，米</summary>
     ''' <remarks>
@@ -124,6 +124,7 @@ Public Class MjEngineBridge
         World.ContactDampingRatio = 1.0
         World.HooksAfterGravity = False
         World.MarginOnlyContacts = False
+        ' 不早停：实测残差到不了可用的阈值，早停只会白算一遍残差
         World.SolverTolerance = 0.0
 
         ' 走路时每个落地瞬间都会瞬间静止，睡眠会冻结推进
