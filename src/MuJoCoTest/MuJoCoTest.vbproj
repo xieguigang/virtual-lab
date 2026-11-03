@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>MuJoCoTest</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+    <StartupObject>MuJoCoTest.Program</StartupObject>
+    <Description>纯托管 MuJoCo 仿真库的自测用例：加载、运动学、动力学、雅可比、推进与 duck 站立稳定性</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MuJoCo\MuJoCo.vbproj" />
+    <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\Microsoft.VisualBasic.Core\src\Core.vbproj" />
+  </ItemGroup>
+
+</Project>
