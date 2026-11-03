@@ -90,7 +90,7 @@ Namespace Render
         ''' been booted or has switched the shape
         ''' </summary>
         Public Sub PrepareRig()
-            If Session Is Nothing OrElse Session.Duck Is Nothing Then
+            If Session Is Nothing OrElse Session.World Is Nothing Then
                 Return
             End If
 
@@ -113,15 +113,14 @@ Namespace Render
         End Function
 
         Private Sub UploadBall()
-            Dim sphere As Engine.Physics.Collision3D.ConvexMesh3D =
-                Engine.Physics.Collision3D.ConvexMesh3D.CreateSphereMesh(SimConstants.BallRadius, 16, 10)
+            Dim sphere As Double() = MuJoCo.Geometry.StlReader.SphereTriangles(SimConstants.BallRadius, 16, 10)
 
-            If sphere Is Nothing Then
+            If sphere Is Nothing OrElse sphere.Length < 9 Then
                 Return
             End If
 
             Dim color As Color = Color.FromArgb(255, 250, 246, 238)
-            Dim vertices As Dx.SceneMeshVertex() = SceneMeshBuilder.FromConvex(sphere, color)
+            Dim vertices As Dx.SceneMeshVertex() = SceneMeshBuilder.FromTriangles(sphere, color)
 
             Call m_renderer.UploadMesh("ball", vertices)
 
@@ -136,7 +135,7 @@ Namespace Render
                 Return
             End If
 
-            SyncLock Session.Duck
+            SyncLock Session.World
                 Call Session.Snapshot(Snapshot)
             End SyncLock
 
