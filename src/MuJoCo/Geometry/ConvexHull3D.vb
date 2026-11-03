@@ -69,6 +69,16 @@ Namespace Geometry
                 Return Nothing
             End If
 
+            ' 按到点的平均位置的距离降序插入：QuickHull 的经典做法。
+            ' 先插入极值点会把凸包撑到接近最终大小，后面的点绝大多数落在内部，
+            ' 每次插入只改动少数几个面；顺序反过来时凸包长期处于"又扁又长"的
+            ' 中间态，几乎每个点都能看见一大片面，缝合出的近共面三角形会
+            ' 逐步破坏流形性，最终面数爆炸。
+            Dim center As Vector3 = Average(unique)
+
+            unique = unique.OrderByDescending(
+                Function(p As Vector3) (p - center).LengthSquared()).ToList()
+
             Dim count As Integer = unique.Count
             Dim scale As Double = Extent(unique)
 
@@ -76,7 +86,30 @@ Namespace Geometry
                 Return Nothing
             End If
 
-            Dim eps As Double = Math.Max(tolerance, scale * 1.0E-7)
+            ' 可见性容差不能取到浮点噪声的量级：STL 的顶点是 float32，
+            ' 相对精度约 1e-7，如果 eps 也在这个量级，贴着已有表面的点会被判成"外部"，
+            ' 从而缝合出一批几乎共面的新面，凸包随之破掉。
+            ' 从尺寸的 1e-5（5 cm 的零件 ≈ 0.5 µm）起步，发散一次就放大 8 倍重试：
+            ' 贴面的点被当作"在表面上"跳过之后，凸包的形状误差仍在微米级，
+            ' 但流形性得以保持。
+            Dim factor As Double = 1.0E-5
+
+            For attempt As Integer = 1 To 4
+                Dim hull As ConvexHullResult = Build(unique, Math.Max(tolerance, scale * factor), scale)
+
+                If hull IsNot Nothing Then
+                    Return hull
+                End If
+
+                factor *= 8.0
+            Next
+
+            Return Nothing
+        End Function
+
+        ''' <summary>一次增量凸包尝试；发散或退化时返回 <c>Nothing</c></summary>
+        Private Function Build(unique As List(Of Vector3), eps As Double, scale As Double) As ConvexHullResult
+            Dim count As Integer = unique.Count
 
             ' ---- 1. 初始四面体 ----
             Dim i0 As Integer = 0
@@ -98,7 +131,6 @@ Namespace Geometry
 
             Dim p0 As Vector3 = unique(i0)
             Dim p1 As Vector3 = unique(i1)
-            Dim dir As Vector3 = Vector3.Normalize(p1 - p0)
             Dim i2 As Integer = -1
             best = -1.0
 
@@ -155,11 +187,9 @@ Namespace Geometry
 
                 Call Insert(faces, unique, i, eps, scale)
 
-                ' 防御性上限：算法本身不应该发散，但输入含 NaN 或极退化几何时
-                ' 宁可放弃凸包（调用方回退到包围盒），也不能把进程的内存吃光
+                ' 防御性上限：算法发散时宁可放弃凸包（调用方回退到包围盒），
+                ' 也不能把进程的内存吃光
                 If faces.Count > MaxFaces Then
-                    Call $"convex hull diverged at point {i} with {faces.Count} faces — abandoned".debug
-
                     Return Nothing
                 End If
             Next
@@ -490,6 +520,20 @@ Namespace Geometry
 
             ' 抽稀失败（极端形状）：宁可算一个大一点的凸包，也不能返回空
             Return points
+        End Function
+
+        Private Function Average(points As List(Of Vector3)) As Vector3
+            Dim sum As Vector3 = Vector3.Zero
+
+            For Each p In points
+                sum += p
+            Next
+
+            If points.Count = 0 Then
+                Return Vector3.Zero
+            End If
+
+            Return sum / CSng(points.Count)
         End Function
 
         Private Function Extent(points As List(Of Vector3)) As Double

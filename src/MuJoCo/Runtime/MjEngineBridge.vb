@@ -59,6 +59,9 @@ Public Class MjEngineBridge
     ''' <summary>关节的父体是 worldbody 时使用的静态锚点刚体</summary>
     Private m_worldAnchor As Eng.RigidBody3D
 
+    ''' <summary>拿到真正凸包代理的 body 个数（诊断用）</summary>
+    Private m_convexProxies As Integer
+
     Private ReadOnly m_data As mjData
 
     Public Sub New(model As mjModel, data As mjData)
@@ -72,7 +75,8 @@ Public Class MjEngineBridge
         Call CreateEqualities()
 
         Call ($"bridge ready: {Model.nbody} bodies, {Model.nv} dofs, {Model.ngeom} geoms, " &
-              $"{Model.nactuator} actuators, {StaticGeoms.Count} static geoms").debug
+              $"{Model.nactuator} actuators, {StaticGeoms.Count} static geoms, " &
+              $"{m_convexProxies} convex proxies").debug
 
         Hook.Model = model
         Hook.Data = data
@@ -110,6 +114,10 @@ Public Class MjEngineBridge
         For i As Integer = 1 To nbody - 1
             Dim mass As Double = Model.body_mass(i)
             Dim shape As Collision3D.Collider3D = MjCollisionModel.BodyCollider(Model, i)
+
+            If shape.Kind = Collision3D.ShapeKind3D.Convex Then
+                m_convexProxies += 1
+            End If
             Dim friction As Double = FrictionOf(i)
             Dim material As New Eng.PhysicsMaterial(friction, 0.0)
 
