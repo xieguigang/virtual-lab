@@ -324,7 +324,7 @@ Public Class MjEngineBridge
                     ' 关节行程改由 MjActuatorHook 用反算出来的坐标做速度级约束
                     hinge.EnableLimit = False
                     hinge.AngularCorrection = 0.0
-                    hinge.Damping = Model.dof_damping(Model.jnt_dofadr(j))
+                    hinge.Damping = 0.0 ' Model.dof_damping(Model.jnt_dofadr(j))
 
                     Call World.Add(hinge)
 
