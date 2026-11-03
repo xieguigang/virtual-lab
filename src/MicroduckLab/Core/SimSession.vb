@@ -2,8 +2,8 @@ Imports System.Diagnostics
 Imports System.Numerics
 Imports System.Threading
 Imports MicroduckLab.Assets
+Imports MuJoCo
 Imports MuJoCo.Assets
-Imports Eng = Microsoft.VisualBasic.Engine.Physics
 
 Namespace Core
 
@@ -424,31 +424,29 @@ Namespace Core
                 Dim left As Vector3 = World.AnklePosition(True)
                 Dim right As Vector3 = World.AnklePosition(False)
 
-                If True Then
-                    Dim zl As Double = left.Z
-                    Dim zr As Double = right.Z
-                    Dim ground As Double = Math.Min(zl, zr)
+                Dim zl As Double = left.Z
+                Dim zr As Double = right.Z
+                Dim ground As Double = Math.Min(zl, zr)
 
-                    For foot As Integer = 0 To 1
-                        Dim z As Double = If(foot = 0, zl, zr)
-                        Dim relative As Double = z - ground
-                        Dim vz As Double = (z - m_footHeight(foot)) / SimConstants.CtrlDt
+                For foot As Integer = 0 To 1
+                    Dim z As Double = If(foot = 0, zl, zr)
+                    Dim relative As Double = z - ground
+                    Dim vz As Double = (z - m_footHeight(foot)) / SimConstants.CtrlDt
 
-                        m_footHeight(foot) = z
+                    m_footHeight(foot) = z
 
-                        If relative > 0.012 Then
-                            m_footAir(foot) = True
-                        ElseIf m_footAir(foot) AndAlso relative < 0.005 AndAlso vz < -0.02 AndAlso
-                               elapsed - m_footAt(foot) > 130 Then
-                            m_footAir(foot) = False
-                            m_footAt(foot) = elapsed
+                    If relative > 0.012 Then
+                        m_footAir(foot) = True
+                    ElseIf m_footAir(foot) AndAlso relative < 0.005 AndAlso vz < -0.02 AndAlso
+                           elapsed - m_footAt(foot) > 130 Then
+                        m_footAir(foot) = False
+                        m_footAt(foot) = elapsed
 
-                            Dim strength As Single = CSng(Math.Min(1, Math.Abs(vz) / 0.35))
+                        Dim strength As Single = CSng(Math.Min(1, Math.Abs(vz) / 0.35))
 
-                            RaiseEvent Footstep(foot = 0, strength)
-                        End If
-                    Next
-                End If
+                        RaiseEvent Footstep(foot = 0, strength)
+                    End If
+                Next
             End If
 
             ' the trunk hit something nearby
@@ -713,7 +711,7 @@ Namespace Core
         ''' other shape
         ''' </summary>
         Public Sub SetShape(loco As Locomotion)
-            If loco = Shape AndAlso Duck IsNot Nothing Then
+            If loco = Shape AndAlso World IsNot Nothing Then
                 Return
             End If
 
