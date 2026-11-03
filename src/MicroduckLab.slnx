@@ -72,4 +72,5 @@
   <Project Path="MicroduckLab/MicroduckLab.vbproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="MuJoCo/MuJoCo.vbproj" Id="4bfa3b60-f2e2-44ca-af1c-328e76091faf" />
 </Solution>
