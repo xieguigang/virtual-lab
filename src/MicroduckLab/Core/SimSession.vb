@@ -23,12 +23,12 @@ Namespace Core
         Public ReadOnly Property Meshes As New MeshLibrary()
         Public ReadOnly Property Policies As New PolicyLibrary()
         Public ReadOnly Property Machine As New GameModeMachine()
-        Public ReadOnly Property Tuning As New PhysicsTuning()
+        ''' <summary>场景构建参数（时间步、迭代数、场地与小球）</summary>
+        Public ReadOnly Property Scene As New MjSceneOptions()
 
         Public Property Skeleton As DuckSkeleton
-        Public Property Duck As DuckPhysics
-        Public Property Arena As Arena
-        Public Property Ball As BallBody
+        ''' <summary>仿真门面：持有 mjModel / mjData，duck + 场地 + 小球一体推进</summary>
+        Public Property World As MjWorld
         Public Property Observer As ObservationBuilder
 
         ''' <summary>the shape that is loaded right now</summary>
@@ -119,15 +119,16 @@ Namespace Core
 
             Call Trace($"skeleton: {Skeleton.Nodes.Count} links, {Skeleton.Driven.Count} hinges, {Skeleton.TotalMass * 1000:0.0} g")
 
-            Call Trace("building the collision proxies")
+            Call Trace("compiling the scene with the managed MuJoCo runtime")
             Call BuildWorld()
 
-            Call Trace($"physics: {Duck.Links.Count} bodies, {Duck.ColliderCount} convex proxies, {Meshes.TriangleCount} triangles")
+            Call Trace($"physics: {World.Model.nbody} bodies, {World.Model.nv} dofs, " &
+                       $"{World.ColliderCount} collision proxies, {Meshes.TriangleCount} triangles")
 
             Call Trace("loading the policies")
             Call Policies.LoadLegs(AddressOf Trace)
 
-            Observer = New ObservationBuilder(Duck)
+            Observer = New ObservationBuilder(World)
 
             m_booted = True
 
@@ -136,10 +137,11 @@ Namespace Core
         End Sub
 
         Private Sub BuildWorld()
-            Duck = New DuckPhysics(Skeleton, Meshes, Tuning)
-            Arena = New Arena(Duck.World, Tuning)
-            Ball = New BallBody(Duck.World, Tuning)
-            Observer = New ObservationBuilder(Duck)
+            Call World?.Dispose()
+
+            World = New MjWorld(Skeleton, AssetPath.RobotFile(MjcfFile(Shape)),
+                                AssetPath.MeshDirectory, Scene)
+            Observer = New ObservationBuilder(World)
         End Sub
 
         Public Shared Function KinematicsFile(loco As Locomotion) As String
@@ -240,17 +242,10 @@ Namespace Core
         Private Sub ControlStep()
             Dim machine As GameModeMachine = Me.Machine
 
-            ' hold the last target while the duck settles after a fall
-            Duck.Drive.Frozen = machine.Recovery = RecoveryState.Settle
+            ' hold the current pose while the duck settles after a fall
+            World.Frozen = machine.Recovery = RecoveryState.Settle
 
-            ' standing and walking want opposite things from the weight feed forward
-            ' (bench: 244/250 standing against 245/250 walking, each with the other
-            ' setting), so the stick decides which of the two this control step is
-            Dim driving As Boolean = Math.Abs(m_forward) > 0.01 OrElse Math.Abs(m_turn) > 0.01
-
-            Duck.Drive.GravityCompensation = If(driving, 1.0, 0.0)
-
-            If Not Duck.Drive.Frozen Then
+            If Not World.Frozen Then
                 Dim command As Double() = ComposeCommand()
                 Dim observation As Double() = Observer.Build(m_lastAction, command)
                 Dim session As PolicySession = Policies.Active(machine.Mode, machine.Loco, machine.Recovery)
@@ -280,13 +275,13 @@ Namespace Core
                 End If
             End If
 
-            Call Duck.Drive.SetTargets(m_targets)
-            Call Duck.Advance()
+            Call World.SetTargets(m_targets)
+            Call World.Step()
 
             m_steps += 1
 
-            Dim gravityZ As Double = Duck.ProjectedGravityZ()
-            Dim trunkHeight As Double = Duck.Trunk.FramePosition.Z
+            Dim gravityZ As Double = World.ProjectedGravityZ()
+            Dim trunkHeight As Double = World.TrunkPosition.Z
             Dim reset As Boolean = False
 
             ' the solver exploded
@@ -351,8 +346,8 @@ Namespace Core
             End If
 
             ' a ball that left the arena through a solver glitch comes back
-            If Ball.Active Then
-                Dim position As Vector3 = Ball.Position
+            If World.BallActive Then
+                Dim position As Vector3 = World.BallPosition
 
                 If Math.Abs(position.X) > SimConstants.ArenaHalf + 0.1 OrElse
                    Math.Abs(position.Y) > SimConstants.ArenaHalf + 0.1 OrElse
@@ -426,12 +421,12 @@ Namespace Core
             Dim elapsed As Long = m_clock.ElapsedMilliseconds
 
             If machine.Loco = Locomotion.Legs AndAlso Not machine.InputLocked Then
-                Dim left As BodyLink = Duck.LeftAnkle
-                Dim right As BodyLink = Duck.RightAnkle
+                Dim left As Vector3 = World.AnklePosition(True)
+                Dim right As Vector3 = World.AnklePosition(False)
 
-                If left IsNot Nothing AndAlso right IsNot Nothing Then
-                    Dim zl As Double = left.FramePosition.Z
-                    Dim zr As Double = right.FramePosition.Z
+                If True Then
+                    Dim zl As Double = left.Z
+                    Dim zr As Double = right.Z
                     Dim ground As Double = Math.Min(zl, zr)
 
                     For foot As Integer = 0 To 1
@@ -458,12 +453,12 @@ Namespace Core
 
             ' the trunk hit something nearby
             If Not machine.InputLocked Then
-                Dim velocity As Vector3 = Duck.TrunkVelocity()
+                Dim velocity As Vector3 = World.TrunkVelocity()
 
                 If m_bumpPrevValid Then
                     Dim dv As Double = (velocity - New Vector3(CSng(m_bumpPrev(0)), CSng(m_bumpPrev(1)), CSng(m_bumpPrev(2)))).Length()
 
-                    If dv > 0.35 AndAlso elapsed - m_bumpAt > 300 AndAlso NearObstacle(Duck.Trunk.FramePosition) Then
+                    If dv > 0.35 AndAlso elapsed - m_bumpAt > 300 AndAlso NearObstacle(World.TrunkPosition) Then
                         m_bumpAt = elapsed
                         RaiseEvent Bump(CSng(Math.Min(1, (dv - 0.35) / 1.5)))
                     End If
@@ -478,11 +473,11 @@ Namespace Core
             End If
 
             ' the ball thumps on the velocity delta between two control steps
-            If Ball.Active Then
-                Dim body As Eng.RigidBody3D = Ball.Body
-                Dim vx As Double = body.Velocity.x
-                Dim vy As Double = body.Velocity.y
-                Dim vz As Double = body.Velocity.z
+            If World.BallActive Then
+                Dim velocity As Vector3 = World.BallVelocity
+                Dim vx As Double = velocity.X
+                Dim vy As Double = velocity.Y
+                Dim vz As Double = velocity.Z
 
                 If m_ballPrevValid Then
                     Dim dx As Double = vx - m_ballPrev(0)
@@ -517,42 +512,42 @@ Namespace Core
             SyncLock m_sync
                 Dim working As PoseSnapshot = m_working
 
-                Dim links As List(Of BodyLink) = Duck.Links
+                Dim count As Integer = Math.Min(Skeleton.Nodes.Count, PoseSnapshot.MaxLinks)
 
-                For i As Integer = 0 To Math.Min(links.Count, PoseSnapshot.MaxLinks) - 1
-                    working.BodyWorld(i) = links(i).World
+                For i As Integer = 0 To count - 1
+                    working.BodyWorld(i) = World.NodeWorld(i)
                 Next
 
-                working.BodyCount = links.Count
+                working.BodyCount = count
 
                 For j As Integer = 0 To SimConstants.NumJoints - 1
-                    working.JointAngles(j) = Duck.JointAngle(j)
-                    working.JointSpeeds(j) = Duck.JointSpeed(j)
+                    working.JointAngles(j) = World.JointAngle(j)
+                    working.JointSpeeds(j) = World.JointSpeed(j)
                 Next
 
                 m_jawSmooth += (m_jaw - m_jawSmooth) * 0.35
 
                 working.JawOpen = CSng(m_jawSmooth)
-                working.BallVisible = Ball.Active
-                working.BallMatrix = Ball.World
+                working.BallVisible = World.BallActive
+                working.BallMatrix = World.BallWorld
                 working.Mode = Machine.Mode
                 working.Recovering = Machine.Recovery <> RecoveryState.None
-                working.TrunkPosition = Duck.Trunk.FramePosition
-                working.TrunkYaw = YawOf(Duck.Trunk.FrameRotation)
+                working.TrunkPosition = World.TrunkPosition
+                working.TrunkYaw = YawOf(World.TrunkRotation)
 
                 Dim telemetry As New TelemetryFrame With {
                     .ModeLabel = Machine.Label,
                     .Mode = Machine.Mode,
                     .Loco = Machine.Loco,
                     .ControlHz = m_ctrlHz,
-                    .Speed = Duck.TrunkVelocity().Length(),
-                    .TurnRate = Duck.Trunk.Body.AngularVelocity.z,
-                    .TrunkHeight = Duck.Trunk.FramePosition.Z,
-                    .GravityZ = Duck.ProjectedGravityZ(),
+                    .Speed = World.TrunkVelocity().Length(),
+                    .TurnRate = World.TrunkAngularVelocity.Z,
+                    .TrunkHeight = World.TrunkPosition.Z,
+                    .GravityZ = World.ProjectedGravityZ(),
                     .PolicyName = PolicyLabel(),
                     .InferenceMs = m_lastInferenceMs,
                     .ControlStepMs = m_lastStepMs,
-                    .BallActive = Ball.Active,
+                    .BallActive = World.BallActive,
                     .HeadMode = Machine.HeadMode,
                     .Recovering = Machine.Recovery <> RecoveryState.None,
                     .Driving = Machine.AllowsTwist() AndAlso (Math.Abs(m_forward) > 0.01 OrElse Math.Abs(m_turn) > 0.01)
@@ -688,9 +683,9 @@ Namespace Core
                 m_targets(j) = SimConstants.DefaultPose(j)
             Next
 
-            Call Duck.Spawn()
-            Call Duck.Drive.SetTargets(m_targets)
-            Call Ball.Park()
+            Call World.Spawn()
+            Call World.SetTargets(m_targets)
+            Call World.ParkBall()
             Call SpawnBall()
 
             m_footAir(0) = False
@@ -706,11 +701,11 @@ Namespace Core
         ''' drop the ball next to the duck
         ''' </summary>
         Public Sub SpawnBall()
-            If Ball Is Nothing Then
+            If World Is Nothing Then
                 Return
             End If
 
-            Ball.Spawn(Duck.Trunk.FramePosition, YawOf(Duck.Trunk.FrameRotation), m_random)
+            World.SpawnBall(World.TrunkPosition, YawOf(World.TrunkRotation), m_random)
         End Sub
 
         ''' <summary>
@@ -756,16 +751,28 @@ Namespace Core
         ''' add or remove the cosine relief of the arena
         ''' </summary>
         Public Sub SetRelief(enabled As Boolean)
-            If Arena Is Nothing Then
+            If World Is Nothing Then
                 Return
             End If
 
-            Call Arena.SetRelief(Duck.World, enabled)
+            Dim wasRunning As Boolean = m_running
+
+            Call [Stop]()
+
+            Try
+                ' 矮丘是模型的一部分，重建之后 duck 回到出生点
+                Call World.SetRelief(enabled)
+                Call ResetSim()
+            Finally
+                If wasRunning Then
+                    Call Start()
+                End If
+            End Try
         End Sub
 
         Public ReadOnly Property ReliefEnabled As Boolean
             Get
-                Return Arena IsNot Nothing AndAlso Arena.ReliefEnabled
+                Return World IsNot Nothing AndAlso World.ReliefEnabled
             End Get
         End Property
 
@@ -773,12 +780,9 @@ Namespace Core
             Call [Stop]()
 
             Call Policies.Dispose()
-            Call Duck?.Dispose()
-            Call Arena?.Dispose()
+            Call World?.Dispose()
 
-            Duck = Nothing
-            Arena = Nothing
-            Ball = Nothing
+            World = Nothing
         End Sub
     End Class
 End Namespace

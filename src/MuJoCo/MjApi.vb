@@ -372,6 +372,20 @@ Public Module MjApi
     '  复位
     '/********************************************************************************/
 
+    ''' <summary>
+    ''' 清掉接触的暖启动缓存（托管层扩展，C 版没有对应函数）。
+    ''' </summary>
+    ''' <remarks>
+    ''' 把刚体瞬移之后必须调用：求解器继承自上一帧的支撑冲量会把整机弹飞。
+    ''' <c>mj_resetData</c> / <c>mj_setState</c> 内部已经调用过本函数，
+    ''' 手工改 <c>qpos</c> 之后要自己补一次。
+    ''' </remarks>
+    Public Sub mj_clearContactCache(m As mjModel, d As mjData)
+        If d IsNot Nothing AndAlso d.Engine IsNot Nothing Then
+            Call d.Engine.InvalidateContacts()
+        End If
+    End Sub
+
     ''' <summary>复位到默认状态；内部同时清掉暖启动缓存</summary>
     Public Sub mj_resetData(m As mjModel, d As mjData)
         d.time = 0.0
