@@ -2,6 +2,7 @@ Imports System.Diagnostics
 Imports System.Numerics
 Imports System.Threading
 Imports MicroduckLab.Assets
+Imports MuJoCo.Assets
 Imports Eng = Microsoft.VisualBasic.Engine.Physics
 
 Namespace Core
@@ -252,7 +253,7 @@ Namespace Core
             If Not Duck.Drive.Frozen Then
                 Dim command As Double() = ComposeCommand()
                 Dim observation As Double() = Observer.Build(m_lastAction, command)
-                Dim session As PolicySession = Policies.Active(machine.Mode, Machine.Loco, machine.Recovery)
+                Dim session As PolicySession = Policies.Active(machine.Mode, machine.Loco, machine.Recovery)
 
                 If session IsNot Nothing Then
                     Dim action As Double() = session.Run(observation)
@@ -513,57 +514,57 @@ Namespace Core
         ' /********************************************************************************/
 
         Private Sub Capture()
-          SyncLock m_sync
-            Dim working As PoseSnapshot = m_working
+            SyncLock m_sync
+                Dim working As PoseSnapshot = m_working
 
-            Dim links As List(Of BodyLink) = Duck.Links
+                Dim links As List(Of BodyLink) = Duck.Links
 
-            For i As Integer = 0 To Math.Min(links.Count, PoseSnapshot.MaxLinks) - 1
-                working.BodyWorld(i) = links(i).World
-            Next
+                For i As Integer = 0 To Math.Min(links.Count, PoseSnapshot.MaxLinks) - 1
+                    working.BodyWorld(i) = links(i).World
+                Next
 
-            working.BodyCount = links.Count
+                working.BodyCount = links.Count
 
-            For j As Integer = 0 To SimConstants.NumJoints - 1
-                working.JointAngles(j) = Duck.JointAngle(j)
-                working.JointSpeeds(j) = Duck.JointSpeed(j)
-            Next
+                For j As Integer = 0 To SimConstants.NumJoints - 1
+                    working.JointAngles(j) = Duck.JointAngle(j)
+                    working.JointSpeeds(j) = Duck.JointSpeed(j)
+                Next
 
-            m_jawSmooth += (m_jaw - m_jawSmooth) * 0.35
+                m_jawSmooth += (m_jaw - m_jawSmooth) * 0.35
 
-            working.JawOpen = CSng(m_jawSmooth)
-            working.BallVisible = Ball.Active
-            working.BallMatrix = Ball.World
-            working.Mode = Machine.Mode
-            working.Recovering = Machine.Recovery <> RecoveryState.None
-            working.TrunkPosition = Duck.Trunk.FramePosition
-            working.TrunkYaw = YawOf(Duck.Trunk.FrameRotation)
+                working.JawOpen = CSng(m_jawSmooth)
+                working.BallVisible = Ball.Active
+                working.BallMatrix = Ball.World
+                working.Mode = Machine.Mode
+                working.Recovering = Machine.Recovery <> RecoveryState.None
+                working.TrunkPosition = Duck.Trunk.FramePosition
+                working.TrunkYaw = YawOf(Duck.Trunk.FrameRotation)
 
-            Dim telemetry As New TelemetryFrame With {
-                .ModeLabel = Machine.Label,
-                .Mode = Machine.Mode,
-                .Loco = Machine.Loco,
-                .ControlHz = m_ctrlHz,
-                .Speed = Duck.TrunkVelocity().Length(),
-                .TurnRate = Duck.Trunk.Body.AngularVelocity.z,
-                .TrunkHeight = Duck.Trunk.FramePosition.Z,
-                .GravityZ = Duck.ProjectedGravityZ(),
-                .PolicyName = PolicyLabel(),
-                .InferenceMs = m_lastInferenceMs,
-                .ControlStepMs = m_lastStepMs,
-                .BallActive = Ball.Active,
-                .HeadMode = Machine.HeadMode,
-                .Recovering = Machine.Recovery <> RecoveryState.None,
-                .Driving = Machine.AllowsTwist() AndAlso (Math.Abs(m_forward) > 0.01 OrElse Math.Abs(m_turn) > 0.01)
-            }
+                Dim telemetry As New TelemetryFrame With {
+                    .ModeLabel = Machine.Label,
+                    .Mode = Machine.Mode,
+                    .Loco = Machine.Loco,
+                    .ControlHz = m_ctrlHz,
+                    .Speed = Duck.TrunkVelocity().Length(),
+                    .TurnRate = Duck.Trunk.Body.AngularVelocity.z,
+                    .TrunkHeight = Duck.Trunk.FramePosition.Z,
+                    .GravityZ = Duck.ProjectedGravityZ(),
+                    .PolicyName = PolicyLabel(),
+                    .InferenceMs = m_lastInferenceMs,
+                    .ControlStepMs = m_lastStepMs,
+                    .BallActive = Ball.Active,
+                    .HeadMode = Machine.HeadMode,
+                    .Recovering = Machine.Recovery <> RecoveryState.None,
+                    .Driving = Machine.AllowsTwist() AndAlso (Math.Abs(m_forward) > 0.01 OrElse Math.Abs(m_turn) > 0.01)
+                }
 
-            m_revision += 1
+                m_revision += 1
 
-            working.Telemetry = telemetry
-            working.Revision = m_revision
+                working.Telemetry = telemetry
+                working.Revision = m_revision
 
-            m_published.CopyFrom(working)
-          End SyncLock
+                m_published.CopyFrom(working)
+            End SyncLock
         End Sub
 
         Private Function PolicyLabel() As String

@@ -1,6 +1,7 @@
 Imports System.IO
 Imports System.Numerics
 Imports MicroduckLab.Assets
+Imports MuJoCo.Assets
 
 Namespace Core
 
