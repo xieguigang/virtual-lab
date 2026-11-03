@@ -36,9 +36,16 @@ Imports EngMat3 = Microsoft.VisualBasic.Engine.Physics.Math3D.Matrix3x3
 Public Class MjEngineBridge
 
     ''' <summary>位置伺服的 Baumgarte 系数（映射自 <c>o_solimp</c> 的经验值）</summary>
-    Public Shared Property DefaultBaumgarte As Double = 0.05
+    ''' <remarks>
+    ''' 取内核自己的默认值 0.2。Nuogou 的 0.05 会让接触点的法向冲量收敛太慢，
+    ''' 脚支撑不足，整机会以匀速"滑"出去。
+    ''' </remarks>
+    Public Shared Property DefaultBaumgarte As Double = 0.2
     ''' <summary>允许的穿透量，米</summary>
-    Public Shared Property DefaultSlop As Double = 0.005
+    ''' <remarks>
+    ''' 脚底只有 3 mm 厚，5 mm 的 slop 会让脚整只陷进地面，摩擦接触点位置失真。
+    ''' </remarks>
+    Public Shared Property DefaultSlop As Double = 0.001
 
     Public ReadOnly Property Model As mjModel
     Public ReadOnly Property World As New Eng.PhysicsWorld3D()
@@ -312,7 +319,10 @@ Public Class MjEngineBridge
                         MjMath.Vec(axisA), MjMath.Vec(axisB),
                         lower, upper, Model.jnt_name(j))
 
-                    hinge.EnableLimit = Model.jnt_limited(j)
+                    ' 内核的限位判据用的是它自己的 Position 读数，而那个读数在
+                    ' 父子固定旋转非恒等时是错的（见 MeasureJoint），所以这里一律关闭，
+                    ' 关节行程改由 MjActuatorHook 用反算出来的坐标做速度级约束
+                    hinge.EnableLimit = False
                     hinge.AngularCorrection = 0.0
                     hinge.Damping = Model.dof_damping(Model.jnt_dofadr(j))
 
@@ -327,7 +337,7 @@ Public Class MjEngineBridge
                         MjMath.Vec(anchorA), MjMath.Vec(anchorB),
                         MjMath.Vec(axisA), lower, upper, Model.jnt_name(j))
 
-                    slide.EnableLimit = Model.jnt_limited(j)
+                    slide.EnableLimit = False
 
                     Call World.Add(slide)
 
@@ -630,25 +640,18 @@ Public Class MjEngineBridge
             End If
 
             Select Case CType(Model.jnt_type(j), mjtJoint)
-                Case mjtJoint.mjJNT_HINGE
-                    Dim hinge As Joints3D.RevoluteJoint3D = m_revolutes(j)
+                Case mjtJoint.mjJNT_HINGE, mjtJoint.mjJNT_SLIDE
+                    ' 从刚体姿态反算，不用内核的 Position/Speed（见 MeasureJoint 的说明）
+                    Dim axisWorld As EngVec = Nothing
+                    Dim length As Double = 0.0
+                    Dim speed As Double = 0.0
 
-                    If hinge Is Nothing Then
+                    If Not MeasureJoint(j, axisWorld, length, speed) Then
                         Continue For
                     End If
 
-                    qpos(adr) = hinge.Position
-                    qvel(dof) = hinge.Speed
-
-                Case mjtJoint.mjJNT_SLIDE
-                    Dim slide As Joints3D.PrismaticJoint3D = m_prismatics(j)
-
-                    If slide Is Nothing Then
-                        Continue For
-                    End If
-
-                    qpos(adr) = slide.Position
-                    qvel(dof) = slide.Speed
+                    qpos(adr) = length
+                    qvel(dof) = speed
 
                 Case mjtJoint.mjJNT_BALL
                     Dim parentId As Integer = Model.body_parentid(body)
@@ -733,43 +736,87 @@ Public Class MjEngineBridge
     '  关节访问
     ' /********************************************************************************/
 
-    ''' <summary>读取一个关节的当前坐标、速度与作用轴；不支持的关节返回 <c>False</c></summary>
+    ''' <summary>读取一个关节的当前坐标、速度与作用轴（世界系）；不支持的关节返回 <c>False</c></summary>
+    ''' <remarks>
+    ''' <para>
+    ''' <b>不</b>使用内核的 <c>RevoluteJoint3D.Position</c> / <c>Speed</c>。
+    ''' 内核的 <c>ComputeAngle</c> 把"绕 <c>hingeAxisA</c>（**父**体系）的分量"
+    ''' 与"增量四元数（**子**体系表达）"直接点乘，两个量不在同一坐标系里：
+    ''' 当子体相对父体带固定旋转（duck 的每个 body 都是 ±90°）时，点乘结果被
+    ''' <c>cos(两轴夹角)</c> 缩放，读数于是要么恒为 0、要么整体反号。
+    ''' 实测 <c>left_hip_roll</c> 恒为 0、<c>left_knee</c> 反号 —— 策略看到的关节角
+    ''' 因此全错，输出恒定动作，机器人朝一个方向匀速跑出场地。
+    ''' </para>
+    ''' <para>
+    ''' 这里改为从父子刚体的世界姿态反算，正好是
+    ''' <see cref="MjKinematics.RunPosition"/> 正变换的逆：
+    ''' <c>Q = conj(parentQuat · body_quat) · childQuat</c>，
+    ''' 关节角 = <c>2·atan2(u·xyz(Q), w(Q))</c>，<c>u</c> 是子体系里的关节轴。
+    ''' </para>
+    ''' </remarks>
     Public Function JointState(joint As Integer, ByRef axis As EngVec, ByRef length As Double,
                                ByRef speed As Double) As Boolean
+        Return MeasureJoint(joint, axis, length, speed)
+    End Function
+
+    ''' <summary>从刚体姿态与角速度反算关节坐标</summary>
+    Private Function MeasureJoint(joint As Integer, ByRef axis As EngVec, ByRef length As Double,
+                                  ByRef speed As Double) As Boolean
         If joint < 0 OrElse joint >= Model.njnt Then
             Return False
         End If
 
-        Select Case CType(Model.jnt_type(joint), mjtJoint)
-            Case mjtJoint.mjJNT_HINGE
-                Dim hinge As Joints3D.RevoluteJoint3D = m_revolutes(joint)
+        Dim kind As mjtJoint = CType(Model.jnt_type(joint), mjtJoint)
 
-                If hinge Is Nothing Then
-                    Return False
-                End If
+        If kind <> mjtJoint.mjJNT_HINGE AndAlso kind <> mjtJoint.mjJNT_SLIDE Then
+            Return False
+        End If
 
-                axis = hinge.WorldAxis
-                length = hinge.Position
-                speed = hinge.Speed
+        Dim body As Integer = Model.jnt_bodyid(joint)
+        Dim child As Eng.RigidBody3D = m_bodies(body)
 
-                Return True
+        If child Is Nothing Then
+            Return False
+        End If
 
-            Case mjtJoint.mjJNT_SLIDE
-                Dim slide As Joints3D.PrismaticJoint3D = m_prismatics(joint)
+        Dim parentId As Integer = Model.body_parentid(body)
+        Dim parent As Eng.RigidBody3D = If(parentId >= 1, m_bodies(parentId), m_worldAnchor)
+        Dim parentQuat As Quaternion = If(parentId >= 1, MjMath.QuatOf(parent.Orientation), Quaternion.Identity)
+        Dim childQuat As Quaternion = MjMath.QuatOf(child.Orientation)
+        Dim localAxis As New Vector3(CSng(Model.jnt_axis(joint * 3)), CSng(Model.jnt_axis(joint * 3 + 1)),
+                                     CSng(Model.jnt_axis(joint * 3 + 2)))
+        Dim axisWorld As Vector3 = MjMath.SafeNormalize(MjMath.Rotate(childQuat, localAxis))
 
-                If slide Is Nothing Then
-                    Return False
-                End If
+        axis = MjMath.Vec(axisWorld)
 
-                axis = slide.WorldAxis
-                length = slide.Position
-                speed = slide.Speed
+        Dim childAngular As Vector3 = MjMath.Vec(child.AngularVelocity)
+        Dim parentAngular As Vector3 = MjMath.Vec(parent.AngularVelocity)
 
-                Return True
+        If kind = mjtJoint.mjJNT_HINGE Then
+            Dim reference As Quaternion = MjMath.Mul(parentQuat, MjMath.Quat(Model.body_quat, body * 4))
+            Dim delta As Quaternion = MjMath.Mul(MjMath.Conj(reference), childQuat)
 
-            Case Else
-                Return False
-        End Select
+            If delta.W < 0 Then
+                delta = New Quaternion(-delta.X, -delta.Y, -delta.Z, -delta.W)
+            End If
+
+            Dim sine As Double = delta.X * localAxis.X + delta.Y * localAxis.Y + delta.Z * localAxis.Z
+
+            length = 2.0 * Math.Atan2(sine, delta.W)
+            speed = Vector3.Dot(childAngular - parentAngular, axisWorld)
+        Else
+            Dim bodyPos As New Vector3(CSng(Model.body_pos(body * 3)), CSng(Model.body_pos(body * 3 + 1)),
+                                       CSng(Model.body_pos(body * 3 + 2)))
+            Dim ipos As New Vector3(CSng(Model.body_ipos(body * 3)), CSng(Model.body_ipos(body * 3 + 1)),
+                                    CSng(Model.body_ipos(body * 3 + 2)))
+            Dim reference As Vector3 = MjMath.Vec(parent.Position) + MjMath.Rotate(parentQuat, bodyPos)
+            Dim origin As Vector3 = MjMath.Vec(child.Position) - MjMath.Rotate(childQuat, ipos)
+
+            length = Vector3.Dot(origin - reference, axisWorld)
+            speed = Vector3.Dot(MjMath.Vec(child.Velocity) - MjMath.Vec(parent.Velocity), axisWorld)
+        End If
+
+        Return True
     End Function
 
     ''' <summary>沿关节轴施加一个力矩（铰链）或力（滑动）</summary>

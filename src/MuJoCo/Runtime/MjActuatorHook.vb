@@ -77,6 +77,8 @@ Public Class MjActuatorHook
     Public Property FrictionDeadZone As Double = 1.0E-4
     ''' <summary>干摩擦的缩放</summary>
     Public Property FrictionScale As Double = 1.0
+    ''' <summary>关节行程修正的最大速度，rad/s 或 m/s</summary>
+    Public Property BiasSpeedLimit As Double = 0.5
 
     Public Sub BeforeSubstep(dt As Double) Implements Eng.IStepHook.BeforeSubstep
         If Not Enabled OrElse Model Is Nothing OrElse Bridge Is Nothing Then
@@ -135,29 +137,29 @@ Public Class MjActuatorHook
             End Select
         Next
 
-        Call ApplyPassive()
+        Call ApplyPassive(dt)
     End Sub
 
-    ''' <summary>干摩擦与关节弹簧</summary>
-    Private Sub ApplyPassive()
+    ''' <summary>干摩擦、关节弹簧与关节行程</summary>
+    Private Sub ApplyPassive(dt As Double)
         For j As Integer = 0 To Model.njnt - 1
-            Dim friction As Double = 0.0
-            Dim stiffness As Double = Model.jnt_stiffness(j)
             Dim dof As Integer = Model.jnt_dofadr(j)
 
             If dof < 0 OrElse dof >= Model.nv Then
                 Continue For
             End If
 
-            friction = Model.dof_frictionloss(dof)
+            Dim friction As Double = Model.dof_frictionloss(dof)
+            Dim stiffness As Double = Model.jnt_stiffness(j)
+            Dim limited As Boolean = Model.jnt_limited(j)
 
-            If friction <= 0 AndAlso stiffness <= 0 Then
+            If friction <= 0 AndAlso stiffness <= 0 AndAlso Not limited Then
                 Continue For
             End If
 
-            Dim axis As EngVec
-            Dim length As Double
-            Dim speed As Double
+            Dim axis As EngVec = Nothing
+            Dim length As Double = 0.0
+            Dim speed As Double = 0.0
 
             If Not Bridge.JointState(j, axis, length, speed) Then
                 Continue For
@@ -174,10 +176,78 @@ Public Class MjActuatorHook
                 torque -= std.Sign(speed) * friction * FrictionScale
             End If
 
+            If limited Then
+                torque += LimitTorque(j, dof, length, speed, dt)
+            End If
+
             If std.Abs(torque) > 1.0E-12 Then
                 Call Bridge.ApplyJointForce(j, torque)
             End If
         Next
     End Sub
+
+    ''' <summary>
+    ''' 关节行程的速度级约束：越界时把沿轴的速度推向"回到界内"的方向。
+    ''' </summary>
+    ''' <remarks>
+    ''' 内核 <c>RevoluteJoint3D</c> 的限位是用它自己的 <c>Position</c> 判据做的，
+    ''' 而那个读数在父子固定旋转非恒等时是错的（见 <c>MjEngineBridge.MeasureJoint</c>），
+    ''' 所以限位在桥接层关闭、由这里用反算出来的坐标重新实现。
+    ''' 冲量按质量矩阵的对角元估计，等效于一层不带耦合的单行 PGS。
+    ''' </remarks>
+    Private Function LimitTorque(joint As Integer, dof As Integer,
+                                 length As Double, speed As Double, dt As Double) As Double
+        If dt <= 0 Then
+            Return 0.0
+        End If
+
+        Dim lower As Double = Model.jnt_range(joint * 2)
+        Dim upper As Double = Model.jnt_range(joint * 2 + 1)
+
+        If lower >= upper Then
+            Return 0.0
+        End If
+
+        Dim target As Double
+
+        If length < lower Then
+            target = (lower - length) / dt
+        ElseIf length > upper Then
+            target = (upper - length) / dt
+        Else
+            Return 0.0
+        End If
+
+        ' 修正速度不超过 BiasSpeedLimit，避免深穿透时炸开
+        target = std.Min(BiasSpeedLimit, std.Max(-BiasSpeedLimit, target))
+
+        ' 只做单向推：已经在往界内走就不再加力
+        If (target > 0 AndAlso speed >= target) OrElse (target < 0 AndAlso speed <= target) Then
+            Return 0.0
+        End If
+
+        Dim effective As Double = EffectiveInertia(dof)
+
+        Return (target - speed) * effective / dt
+    End Function
+
+    ''' <summary>质量矩阵的对应对角元，取不到时退回 1</summary>
+    Private Function EffectiveInertia(dof As Integer) As Double
+        Dim nv As Integer = Model.nv
+
+        If Data Is Nothing OrElse Data.M Is Nothing OrElse nv <= 0 Then
+            Return 1.0
+        End If
+
+        Dim index As Integer = dof * nv + dof
+
+        If index < 0 OrElse index >= Data.M.Length Then
+            Return 1.0
+        End If
+
+        Dim value As Double = Data.M(index)
+
+        Return If(value > 0, value, 1.0)
+    End Function
 
 End Class

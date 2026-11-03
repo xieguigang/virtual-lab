@@ -13,7 +13,11 @@ Namespace Core
         ''' <summary>物理子步长，秒</summary>
         Public Property Timestep As Double = SimConstants.Timestep
         ''' <summary>求解器迭代次数</summary>
-        Public Property Iterations As Integer = 24
+        ''' <remarks>
+        ''' 四足站立时每条腿的接触冲量要互相平衡，24 次 PGS 迭代收敛不够，
+        ''' 表现为脚打滑、整机匀速漂移；MuJoCo 的默认值 100 在这个规模上开销可以接受。
+        ''' </remarks>
+        Public Property Iterations As Integer = 100
         ''' <summary>是否加入四面矮墙</summary>
         Public Property IncludeWalls As Boolean = True
         ''' <summary>是否加入余弦矮丘（地形原型）</summary>

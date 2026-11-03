@@ -47,6 +47,9 @@ Module Program
         Call Run("ray", AddressOf CaseRay)
         Call Run("duck standing", AddressOf CaseDuckStanding)
         Call Run("arena scene", AddressOf CaseArenaScene)
+        Call Run("joint readback", AddressOf CaseJointReadback)
+        Call Run("stand still", AddressOf CaseStandStill)
+        Call Run("friction", AddressOf CaseFriction)
 
         Dim report As String = Path.Combine(AppContext.BaseDirectory, "mujoco-test-report.html")
         Call DebugAudit.SaveReport(report)
@@ -764,6 +767,208 @@ Module Program
         Dim trunkZ As Double = d.xpos(trunk * 3 + 2)
 
         Call DebugAudit.Check(trunkZ > -0.2, $"the duck does not fall through the floor (z = {trunkZ:F4})")
+    End Sub
+
+    ' /********************************************************************************/
+    '  11. 关节坐标的回读精度（伺服能不能把关节推到目标）
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 关节角写进 <c>qpos</c> 之后走一步，回读值必须还是原来的数。
+    ''' </summary>
+    ''' <remarks>
+    ''' 这条用例专治"策略一直往一个方向走"：如果关节坐标的回读与真实姿态脱节
+    ''' （读出来恒为 0，或者被固定旋转缩放），策略看到的永远是一组恒定关节角，
+    ''' 于是输出一个恒定动作，机器人就朝一个方向匀速跑掉。
+    ''' </remarks>
+    Private Sub CaseJointReadback()
+        Call DebugAudit.Mark("readback", "qpos survives a step for every hinge")
+
+        Dim m As mjModel = LoadDuck()
+        Dim d As mjData = MjApi.mj_makeData(m)
+
+        ' 每个铰链给一个不同的角度，方便看出是哪个关节对不上
+        Dim targets As New Dictionary(Of String, Double)()
+        Dim index As Integer = 0
+
+        For j As Integer = 0 To m.njnt - 1
+            If CType(m.jnt_type(j), mjtJoint) <> mjtJoint.mjJNT_HINGE Then
+                Continue For
+            End If
+
+            Dim name As String = m.jnt_name(j)
+            Dim angle As Double = 0.05 * (1 + (index Mod 7)) * If(index Mod 2 = 0, 1.0, -1.0)
+
+            d.qpos(m.jnt_qposadr(j)) = angle
+            Call targets.Add(name, angle)
+
+            Dim actuator As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, name)
+
+            If actuator >= 0 Then
+                d.ctrl(actuator) = angle
+            End If
+
+            index += 1
+        Next
+
+        Call MjApi.mj_forward(m, d)
+
+        For Each pair In targets
+            Dim j As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, pair.Key)
+
+            Call DebugAudit.Check(Math.Abs(d.qpos(m.jnt_qposadr(j)) - pair.Value) < 1.0E-9,
+                                  $"kinematics keeps '{pair.Key}' at {pair.Value:F4} (got {d.qpos(m.jnt_qposadr(j)):F4})")
+        Next
+
+        ' 走一步：姿态几乎不变，伺服目标也等于当前角，回读不应该跳变
+        Call MjApi.mj_step(m, d)
+
+        For Each pair In targets
+            Dim j As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, pair.Key)
+            Dim actual As Double = d.qpos(m.jnt_qposadr(j))
+            Dim errorValue As Double = Math.Abs(actual - pair.Value)
+
+            Call DebugAudit.Check(errorValue < 0.05,
+                                  $"'{pair.Key}' readback drifted {errorValue:F4} after one step " &
+                                  $"(set {pair.Value:F4}, read {actual:F4})")
+        Next
+    End Sub
+
+    ' /********************************************************************************/
+    '  12. 站立不漂移（复现"鸭子一直后退、跑出场地"）
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 把 14 个关节摆到站立姿态、伺服目标也设成同一组角度，跑 4 秒，
+    ''' 断言躯干既不下沉也不水平漂移。
+    ''' </summary>
+    ''' <remarks>
+    ''' 这就是用户报的现象的最小复现：关节坐标一旦读错，策略会输出恒定动作，
+    ''' 机器人就会朝一个方向匀速走掉；而这里没有策略，只有位置伺服，
+    ''' 所以它同时验证了"坐标回读"与"伺服跟踪"两条链路。
+    ''' </remarks>
+    Private Sub CaseStandStill()
+        Call DebugAudit.Mark("stand", "the duck holds the stand pose without drifting")
+
+        ' 与 MicroduckLab.Core.SimConstants.JointNames / DefaultPose 逐字一致
+        Dim names As String() = {
+            "left_hip_yaw", "left_hip_roll", "left_hip_pitch", "left_knee", "left_ankle",
+            "neck_pitch", "head_pitch", "head_yaw", "head_roll",
+            "right_hip_yaw", "right_hip_roll", "right_hip_pitch", "right_knee", "right_ankle"}
+        Dim pose As Double() = {
+            0, -0.08726646259971647, -0.457924, -0.00494, 0.452984,
+            0.3490658503988659, 0.3490658503988659, 0, 0,
+            0, 0.08726646259971647, 0.457924, 0.00494, -0.452984}
+
+        Dim m As mjModel = LoadDuck()
+        Dim d As mjData = MjApi.mj_makeData(m)
+        Dim trunk As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "trunk_base")
+
+        For j As Integer = 0 To names.Length - 1
+            Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
+            Dim actuator As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, names(j))
+
+            Call DebugAudit.Check(joint >= 0 AndAlso actuator >= 0, $"'{names(j)}' has a joint and an actuator")
+
+            d.qpos(m.jnt_qposadr(joint)) = pose(j)
+            d.ctrl(actuator) = pose(j)
+        Next
+
+        Call MjApi.mj_forward(m, d)
+        Call MjApi.mj_clearContactCache(m, d)
+
+        Dim x0 As Double = d.xpos(trunk * 3)
+        Dim y0 As Double = d.xpos(trunk * 3 + 1)
+
+        ' 50 Hz × 4 个 5 ms 子步 × 200 次 = 4 秒
+        For iStep As Integer = 1 To 200
+            For subStep As Integer = 1 To 4
+                Call MjApi.mj_step(m, d)
+            Next
+
+            If iStep Mod 25 = 0 Then
+                Call ($"stand t={d.time:F2}s pos=({d.xpos(trunk * 3):F3},{d.xpos(trunk * 3 + 1):F3}," &
+                      $"{d.xpos(trunk * 3 + 2):F3}) v=({d.cvel(trunk * 6 + 3):F3},{d.cvel(trunk * 6 + 4):F3}," &
+                      $"{d.cvel(trunk * 6 + 5):F3}) ncon={d.ncon}").debug
+            End If
+        Next
+
+        Dim drift As Double = Math.Sqrt((d.xpos(trunk * 3) - x0) ^ 2 + (d.xpos(trunk * 3 + 1) - y0) ^ 2)
+        Dim height As Double = d.xpos(trunk * 3 + 2)
+
+        Call DebugAudit.Snapshot(("trunk drift", drift), ("trunk height", height), ("time", d.time))
+        Call DebugAudit.Check(drift < 0.08, $"the duck stays put (drifted {drift:F4} m in 4 s)")
+        Call DebugAudit.Check(height > 0.05, $"the duck stays upright (trunk z = {height:F4})")
+
+        Dim worst As Double = 0.0
+        Dim worstJoint As String = ""
+
+        For j As Integer = 0 To names.Length - 1
+            Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
+            Dim errorValue As Double = Math.Abs(d.qpos(m.jnt_qposadr(joint)) - pose(j))
+
+            If errorValue > worst Then
+                worst = errorValue
+                worstJoint = names(j)
+            End If
+        Next
+
+        Call DebugAudit.Check(worst < 0.25,
+                              $"the servos hold the stand pose (worst '{worstJoint}' off by {worst:F4} rad)")
+    End Sub
+
+    ' /********************************************************************************/
+    '  13. 摩擦（能不能把滑动的箱子停住）
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 1 kg 的立方体以 1 m/s 在 μ=0.8 的地面上滑动，0.5 秒内必须停下。
+    ''' </summary>
+    ''' <remarks>
+    ''' 这条用例把"接触求解"与"刚体树、伺服、观测"完全隔离开：只有一个箱子、
+    ''' 一个平面、一条摩擦力。它不过就说明摩擦项本身没进求解器，
+    ''' 那么任何站立/行走的漂移都只是它的下游症状。
+    ''' </remarks>
+    Private Sub CaseFriction()
+        Call DebugAudit.Mark("friction", "a sliding box is stopped by coulomb friction")
+
+        Dim spec As New MjSpec()
+        spec.Opt.timestep = 0.005
+        spec.Opt.gravity = New Double() {0.0, 0.0, -9.81}
+
+        Dim box As MjsBody = spec.AddBody(spec.World, "box", New Vector3(0, 0, 0.05))
+
+        box.HasInertial = True
+        box.Mass = 1.0
+        box.FullInertia = New Double() {0.001, 0.001, 0.001, 0.0, 0.0, 0.0}
+
+        Call spec.AddFreeJoint(box, "free")
+
+        Dim boxGeom As MjsGeom = spec.AddGeom(box, mjtGeom.mjGEOM_BOX, New Vector3(0.05F, 0.05F, 0.05F))
+        Dim ground As MjsGeom = spec.AddGeom(spec.World, mjtGeom.mjGEOM_PLANE, New Vector3(2, 2, 0))
+
+        boxGeom.Friction = {0.8, 0.005, 0.0001}
+        ground.Friction = {0.8, 0.005, 0.0001}
+
+        Dim m As mjModel = MjApi.mj_compile(spec)
+        Dim d As mjData = MjApi.mj_makeData(m)
+
+        ' free joint 的线速度是世界系
+        d.qvel(0) = 1.0
+
+        For i As Integer = 1 To 100
+            Call MjApi.mj_step(m, d)
+        Next
+
+        ' μ·g = 7.85 m/s²，初速 1 m/s → 0.127 s 停下
+        Call DebugAudit.Snapshot(("vx after 0.5 s", d.qvel(0)),
+                                 ("x after 0.5 s", d.qpos(0)),
+                                 ("ncon", d.ncon))
+
+        Call DebugAudit.Check(Math.Abs(d.qvel(0)) < 0.05,
+                              $"friction stops the box (vx = {d.qvel(0):F4} after 0.5 s)")
+        Call DebugAudit.Check(d.qpos(0) < 0.15,
+                              $"the box does not slide away (x = {d.qpos(0):F4}, expected < 0.13)")
     End Sub
 
 End Module
