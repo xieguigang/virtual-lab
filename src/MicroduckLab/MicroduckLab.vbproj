@@ -35,7 +35,6 @@
     <ProjectReference Include="../..\..\GCModeller\src\runtime\sciBASIC#\Microsoft.VisualBasic.Core\src\Core.vbproj" />
     <ProjectReference Include="../..\..\GCModeller\src\runtime\sciBASIC#\mime\text%html\html_netcore5.vbproj" />
     <ProjectReference Include="../..\..\GCModeller\src\runtime\sciBASIC#\physics\Engine\PhysicsEngine.vbproj" />
-    <ProjectReference Include="../..\..\GCModeller\src\runtime\sciBASIC#\physics\Particles\Particles.vbproj" />
     <ProjectReference Include="../..\..\Microsoft.VisualBasic.Drawing\src\DXApi\DXApi.vbproj" />
     <ProjectReference Include="../..\..\Microsoft.VisualBasic.Drawing\src\DxCanvas\DxCanvas.vbproj" />
     <ProjectReference Include="..\MuJoCo\MuJoCo.vbproj" />
