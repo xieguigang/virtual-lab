@@ -103,13 +103,14 @@ Module Program
 
         Dim m As mjModel = LoadDuck()
 
-        Call DebugAudit.Check(m.nbody = 15, $"nbody = {m.nbody} (expected 15)")
+        ' 15 个刚体 body + worldbody = 16
+        Call DebugAudit.Check(m.nbody = 16, $"nbody = {m.nbody} (expected 15 bodies + worldbody)")
         Call DebugAudit.Check(m.njnt = 15, $"njnt = {m.njnt} (expected 1 free + 14 hinge)")
         Call DebugAudit.Check(m.nq = 21, $"nq = {m.nq} (expected 7 + 14)")
         Call DebugAudit.Check(m.nv = 20, $"nv = {m.nv} (expected 6 + 14)")
         Call DebugAudit.Check(m.nu = 14, $"nu = {m.nu} (expected 14 position actuators)")
         Call DebugAudit.Check(m.nsensor = 6, $"nsensor = {m.nsensor} (expected 6)")
-        Call DebugAudit.Check(m.nsite = 5, $"nsite = {m.nsite} (expected 5)")
+        Call DebugAudit.Check(m.nsite = 7, $"nsite = {m.nsite} (expected 7)")
         Call DebugAudit.Check(m.ncam = 1, $"ncam = {m.ncam} (expected 1)")
 
         ' 名字表双向往返

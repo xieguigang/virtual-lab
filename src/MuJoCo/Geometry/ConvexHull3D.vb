@@ -227,6 +227,31 @@ Namespace Geometry
                 Call Finish(face, points)
                 Call faces.Add(face)
             Next
+
+            ' 已删除的面会一直留在表里，点一多就会把内存吃光；定期压紧一次。
+            ' 代价是每若干个点做一次 O(F) 的拷贝，相对每点 O(F) 的可见性扫描可以忽略。
+            If faces.Count > 64 Then
+                Dim alive As Integer = 0
+
+                For f As Integer = 0 To faces.Count - 1
+                    If faces(f).Alive Then
+                        alive += 1
+                    End If
+                Next
+
+                If alive * 2 < faces.Count Then
+                    Dim kept As New List(Of Face)(alive)
+
+                    For f As Integer = 0 To faces.Count - 1
+                        If faces(f).Alive Then
+                            Call kept.Add(faces(f))
+                        End If
+                    Next
+
+                    faces.Clear()
+                    Call faces.AddRange(kept)
+                End If
+            End If
         End Sub
 
         Private Sub ConsiderEdge(owner As Dictionary(Of Long, Integer), visible As Boolean(),
