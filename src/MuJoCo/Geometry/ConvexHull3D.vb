@@ -1,4 +1,5 @@
 Imports System.Numerics
+Imports Microsoft.VisualBasic
 
 Namespace Geometry
 
@@ -68,6 +69,8 @@ Namespace Geometry
             End If
 
             Dim eps As Double = Math.Max(tolerance, scale * 1.0E-7)
+
+            Call $"  hull: {points.Length} raw → {unique.Count} welded, scale={scale:E2}, eps={eps:E2}".debug
 
             ' ---- 1. 初始四面体 ----
             Dim i0 As Integer = 0
@@ -145,6 +148,16 @@ Namespace Geometry
                 End If
 
                 Call Insert(faces, unique, i, eps)
+
+                If i Mod 200 = 0 Then
+                    Dim alive As Integer = 0
+
+                    For f As Integer = 0 To faces.Count - 1
+                        If faces(f).Alive Then alive += 1
+                    Next
+
+                    Call $"  hull: point {i}/{count}, faces {faces.Count} ({alive} alive)".debug
+                End If
             Next
 
             Return Consolidate(faces, unique)

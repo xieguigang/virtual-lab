@@ -1,4 +1,5 @@
 Imports System.Numerics
+Imports Microsoft.VisualBasic
 Imports Eng = Microsoft.VisualBasic.Engine.Physics
 Imports Collision3D = Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Joints3D = Microsoft.VisualBasic.Engine.Physics.Joints3D
@@ -65,17 +66,17 @@ Public Class MjEngineBridge
         Me.Model = model
         m_data = data
 
-        Console.WriteLine("[bridge] configure")
+        Call $"bridge: configure world (nbody={model.nbody}, ngeom={model.ngeom})".debug
         Call ConfigureWorld()
-        Console.WriteLine("[bridge] bodies")
+        Call "bridge: create bodies".debug
         Call CreateBodies()
-        Console.WriteLine("[bridge] joints")
+        Call "bridge: create joint constraints".debug
         Call CreateJointConstraints()
-        Console.WriteLine("[bridge] actuators")
+        Call "bridge: create actuators".debug
         Call CreateActuators()
-        Console.WriteLine("[bridge] equalities")
+        Call "bridge: create equalities".debug
         Call CreateEqualities()
-        Console.WriteLine("[bridge] done")
+        Call "bridge: done".debug
 
         Hook.Model = model
         Hook.Data = data
@@ -111,10 +112,10 @@ Public Class MjEngineBridge
         Dim bodies(nbody - 1) As Eng.RigidBody3D
 
         For i As Integer = 1 To nbody - 1
-            Console.WriteLine($"[bridge] body {i} {Model.body_name(i)} shape")
+            Call $"bridge: body[{i}] '{Model.body_name(i)}' collider".debug
             Dim mass As Double = Model.body_mass(i)
             Dim shape As Collision3D.Collider3D = MjCollisionModel.BodyCollider(Model, i)
-            Console.WriteLine($"[bridge] body {i} collider {shape.Kind}")
+            Call $"bridge: body[{i}] collider = {shape.Kind}".debug
             Dim friction As Double = FrictionOf(i)
             Dim material As New Eng.PhysicsMaterial(friction, 0.0)
 
