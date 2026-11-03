@@ -41,6 +41,16 @@ Public Class MjEngineBridge
     ''' 脚支撑不足，整机会以匀速"滑"出去。
     ''' </remarks>
     Public Shared Property DefaultBaumgarte As Double = 0.2
+    ''' <summary>
+    ''' 一个 <c>opt.timestep</c> 内切给内核的物理子步数。
+    ''' </summary>
+    ''' <remarks>
+    ''' 这个数值直接决定接触约束的收敛质量：duck 的脚是 3 mm 厚的合并凸包，
+    ''' 挂在五节细长连杆的末端，5 ms 一个子步时接触冲量来不及在 100 次迭代内
+    ''' 与 14 个铰链约束达成一致，脚会"跟着躯干一起滑"（μ 抬到 3 也拦不住）。
+    ''' </remarks>
+    Public Shared Property PhysicsSubsteps As Integer = 4
+
     ''' <summary>允许的穿透量，米</summary>
     ''' <remarks>
     ''' 脚底只有 3 mm 厚，5 mm 的 slop 会让脚整只陷进地面，摩擦接触点位置失真。
@@ -98,13 +108,20 @@ Public Class MjEngineBridge
 
     Private Sub ConfigureWorld()
         World.Gravity = MjMath.Vec(Model.opt.gravity(0), Model.opt.gravity(1), Model.opt.gravity(2))
-        World.FixedDt = Model.opt.timestep
-        World.Substeps = 1
+        World.Substeps = PhysicsSubsteps
+        World.FixedDt = Model.opt.timestep / PhysicsSubsteps
         World.Iterations = Math.Max(4, Model.opt.iterations)
         World.Baumgarte = DefaultBaumgarte
         World.Slop = DefaultSlop
-        World.ContactTimeConstant = Model.opt.o_solref(0)
-        World.ContactDampingRatio = Model.opt.o_solref(1)
+        ' 不要把 MJCF 的 o_solref 直接塞进 ContactTimeConstant：
+        ' MuJoCo 的 solref 是"时间常数 0.02 s + 阻尼比 1"，而内核的同名参数是
+        ' 软约束的弹簧时间常数 —— 填 0.02 会让接触变成一根很软的弹簧，
+        ' 支撑力不够，机器人缓慢下沉（穿透 3.4 → 6.9 mm）并贴着地面匀速滑行
+        ' （实测 0.5 m/s，把摩擦抬到 μ=3 也拦不住）。
+        ' 内核默认的硬接触（时间常数 0 = 纯 Baumgarte + slop）才与 MuJoCo 的
+        ' 默认 solref 在稳定性上等价。
+        World.ContactTimeConstant = 0.0
+        World.ContactDampingRatio = 1.0
         World.HooksAfterGravity = False
         World.MarginOnlyContacts = False
         World.SolverTolerance = 0.0
@@ -324,7 +341,7 @@ Public Class MjEngineBridge
                     ' 关节行程改由 MjActuatorHook 用反算出来的坐标做速度级约束
                     hinge.EnableLimit = False
                     hinge.AngularCorrection = 0.0
-                    hinge.Damping = 0.0 ' Model.dof_damping(Model.jnt_dofadr(j))
+                    hinge.Damping = Model.dof_damping(Model.jnt_dofadr(j))
 
                     Call World.Add(hinge)
 
@@ -854,8 +871,10 @@ Public Class MjEngineBridge
         World.Iterations = Math.Max(4, Model.opt.iterations)
         World.Gravity = MjMath.Vec(Model.opt.gravity(0), Model.opt.gravity(1), Model.opt.gravity(2))
 
-        If World.FixedDt <> Model.opt.timestep Then
-            World.FixedDt = Model.opt.timestep
+        Dim fixedDt As Double = Model.opt.timestep / PhysicsSubsteps
+
+        If World.FixedDt <> fixedDt Then
+            World.FixedDt = fixedDt
         End If
     End Sub
 

@@ -518,6 +518,9 @@ Public Module MjApi
                 contact.frame(1) = normal.y
                 contact.frame(2) = normal.z
 
+                contact.friction(0) = manifold.Friction
+                contact.friction(1) = manifold.Friction
+                contact.friction(2) = manifold.Friction
                 contact.geom1 = RepresentativeGeom(m, BodyIndexOf(m, d, manifold.A))
                 contact.geom2 = RepresentativeGeom(m, BodyIndexOf(m, d, manifold.B))
                 contact.dim = 3

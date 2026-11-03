@@ -50,6 +50,7 @@ Module Program
         Call Run("joint readback", AddressOf CaseJointReadback)
         Call Run("stand still", AddressOf CaseStandStill)
         Call Run("friction", AddressOf CaseFriction)
+        Call Run("convex friction", AddressOf CaseConvexFriction)
 
         Dim report As String = Path.Combine(AppContext.BaseDirectory, "mujoco-test-report.html")
         Call DebugAudit.SaveReport(report)
@@ -915,6 +916,18 @@ Module Program
             End If
         Next
 
+        ' 高摩擦对照：把所有 geom 的滑动摩擦抬到 3.0，如果还滑就不是摩擦的问题
+        Dim mHigh As mjModel = LoadDuck()
+
+        For i As Integer = 0 To mHigh.ngeom - 1
+            mHigh.geom_friction(i * 3) = 3.0
+        Next
+
+        Dim dHigh As mjData = MjApi.mj_makeData(mHigh)
+        Dim sticky As Double() = RunStand(mHigh, dHigh, trunk, names, pose, True, "high-friction", False)
+
+        Call DebugAudit.Snapshot(("drift (mu=3)", sticky(0)))
+
         Dim driven As Double() = RunStand(m, d, trunk, names, pose, False, "servo@pose", False)
         Dim freewheeling As Double() = RunStand(m, d, trunk, names, pose, True, "servo@current", False)
         Dim dry As Double() = RunStand(m, d, trunk, names, pose, True, "zero-friction", True)
@@ -984,10 +997,16 @@ Module Program
                                           $"({d.contact(0).frame(0):F3},{d.contact(0).frame(1):F3}," &
                                           $"{d.contact(0).frame(2):F3})@z={d.contact(0).pos(2):F4}", "none")
 
+                Dim px As Double = 0.0
+
+                For b As Integer = 1 To m.nbody - 1
+                    px += m.body_mass(b) * d.cvel(b * 6 + 3)
+                Next
+
                 Call ($"{label} t={d.time:F2}s x={d.xpos(trunk * 3):F3} z={d.xpos(trunk * 3 + 2):F3} " &
-                      $"sep=({d.xpos(trunk * 3) - d.xpos(ankle * 3):F3},{d.xpos(trunk * 3 + 2) - d.xpos(ankle * 3 + 2):F3}) " &
-                      $"vx[trunk]={d.cvel(trunk * 6 + 3):F3} vx[ankle]={d.cvel(ankle * 6 + 3):F3} " &
-                      $"ncon={d.ncon} n0={normal}").debug
+                      $"px={px:F4} ncon={d.ncon} n0={normal} " &
+                      $"g=({If(d.ncon > 0, d.contact(0).geom1, -1)},{If(d.ncon > 0, d.contact(0).geom2, -1)}) " &
+                      $"mu={If(d.ncon > 0, d.contact(0).friction(0), -1.0):F3}").debug
             End If
         Next
 
@@ -1040,14 +1059,71 @@ Module Program
         Next
 
         ' μ·g = 7.85 m/s²，初速 1 m/s → 0.127 s 停下
-        Call DebugAudit.Snapshot(("vx after 0.5 s", d.qvel(0)),
-                                 ("x after 0.5 s", d.qpos(0)),
-                                 ("ncon", d.ncon))
+        Call ($"box-friction vx={d.qvel(0):F4} x={d.qpos(0):F4} ncon={d.ncon} " &
+              $"pair={If(d.ncon > 0, d.contact(0).geom1, -1)}/{If(d.ncon > 0, d.contact(0).geom2, -1)}").debug
 
         Call DebugAudit.Check(Math.Abs(d.qvel(0)) < 0.05,
                               $"friction stops the box (vx = {d.qvel(0):F4} after 0.5 s)")
         Call DebugAudit.Check(d.qpos(0) < 0.15,
                               $"the box does not slide away (x = {d.qpos(0):F4}, expected < 0.13)")
+    End Sub
+
+    ' /********************************************************************************/
+    '  14. 凸包的摩擦（duck 的脚是合并凸包，不是 BoxCollider）
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 与 <see cref="CaseFriction"/> 完全相同，只是把立方体换成 8 顶点的凸包网格。
+    ''' </summary>
+    Private Sub CaseConvexFriction()
+        Call DebugAudit.Mark("friction", "a sliding convex hull is stopped by coulomb friction")
+
+        Dim spec As New MjSpec()
+        spec.Opt.timestep = 0.005
+        spec.Opt.gravity = New Double() {0.0, 0.0, -9.81}
+
+        Dim box As MjsBody = spec.AddBody(spec.World, "box", New Vector3(0, 0, 0.05))
+
+        box.HasInertial = True
+        box.Mass = 1.0
+        box.FullInertia = New Double() {0.001, 0.001, 0.001, 0.0, 0.0, 0.0}
+
+        Call spec.AddFreeJoint(box, "free")
+
+        Dim vertices As New List(Of Double)(24)
+
+        For Each sx As Double In New Double() {-1, 1}
+            For Each sy As Double In New Double() {-1, 1}
+                For Each sz As Double In New Double() {-1, 1}
+                    Call vertices.Add(sx * 0.05)
+                    Call vertices.Add(sy * 0.05)
+                    Call vertices.Add(sz * 0.05)
+                Next
+            Next
+        Next
+
+        ' 不给 Faces，编译器会自己取凸包
+        Call spec.Meshes.Add(New MjsMesh With {.Name = "cube", .Vertices = vertices.ToArray()})
+
+        Dim boxGeom As MjsGeom = spec.AddGeom(box, mjtGeom.mjGEOM_MESH, Nothing, Vector3.Zero, Nothing, "cube")
+        Dim ground As MjsGeom = spec.AddGeom(spec.World, mjtGeom.mjGEOM_PLANE, New Vector3(2, 2, 0))
+
+        boxGeom.Friction = {0.8, 0.005, 0.0001}
+        ground.Friction = {0.8, 0.005, 0.0001}
+
+        Dim m As mjModel = MjApi.mj_compile(spec)
+        Dim d As mjData = MjApi.mj_makeData(m)
+
+        d.qvel(0) = 1.0
+
+        For i As Integer = 1 To 100
+            Call MjApi.mj_step(m, d)
+        Next
+
+        Call DebugAudit.Snapshot(("vx (convex)", d.qvel(0)), ("x (convex)", d.qpos(0)), ("ncon", d.ncon))
+
+        Call DebugAudit.Check(Math.Abs(d.qvel(0)) < 0.05,
+                              $"friction stops the convex hull (vx = {d.qvel(0):F4} after 0.5 s)")
     End Sub
 
 End Module
