@@ -46,6 +46,7 @@ Module Program
         Call Run("state", AddressOf CaseStateRoundTrip)
         Call Run("ray", AddressOf CaseRay)
         Call Run("duck standing", AddressOf CaseDuckStanding)
+        Call Run("arena scene", AddressOf CaseArenaScene)
 
         Dim report As String = Path.Combine(AppContext.BaseDirectory, "mujoco-test-report.html")
         Call DebugAudit.SaveReport(report)
@@ -673,6 +674,96 @@ Module Program
         Call DebugAudit.Check(joint >= 0, "the first actuator drives a joint")
         Call DebugAudit.Check(Math.Abs(d.actuator_length(actuator) - d.qpos(m.jnt_qposadr(joint))) < 1.0E-9,
                               "actuator_length mirrors qpos")
+    End Sub
+
+    ' /********************************************************************************/
+    '  10. 场地 + 小球（与 MicroduckLab 的 MjSceneBuilder 同一套拼法）
+    ' /********************************************************************************/
+
+    Private Sub CaseArenaScene()
+        Call DebugAudit.Mark("scene", "duck + walls + ball compiled as one model")
+
+        Const arenaHalf As Double = 1.5
+        Const wallHeight As Double = 0.25
+        Const wallThickness As Double = 0.05
+        Const ballRadius As Double = 0.05
+        Const ballMass As Double = 0.03
+
+        Dim modelPath As String = Path.Combine(m_robot, DuckFile)
+        Dim spec As MjSpec = MjcfParser.Parse(modelPath)
+
+        spec.MeshResolver = Function(file As String) Path.Combine(m_robot, "meshes", file)
+        spec.Opt.timestep = 0.005
+        spec.Opt.iterations = 24
+
+        Call spec.AddGeom(spec.World, mjtGeom.mjGEOM_PLANE, New Vector3(arenaHalf, arenaHalf, 0))
+
+        Dim span As Double = 2 * arenaHalf + 2 * wallThickness
+        Dim center As Double = arenaHalf + wallThickness / 2
+
+        For side As Integer = 0 To 3
+            Dim name As String = $"wall_{side}"
+            Dim position As Vector3
+            Dim half As Vector3
+
+            Select Case side
+                Case 0
+                    position = New Vector3(0, center, wallHeight / 2)
+                    half = New Vector3(span / 2, wallThickness / 2, wallHeight / 2)
+                Case 1
+                    position = New Vector3(0, -center, wallHeight / 2)
+                    half = New Vector3(span / 2, wallThickness / 2, wallHeight / 2)
+                Case 2
+                    position = New Vector3(center, 0, wallHeight / 2)
+                    half = New Vector3(wallThickness / 2, span / 2, wallHeight / 2)
+                Case Else
+                    position = New Vector3(-center, 0, wallHeight / 2)
+                    half = New Vector3(wallThickness / 2, span / 2, wallHeight / 2)
+            End Select
+
+            Dim wall As MjsBody = spec.AddBody(spec.World, name, position)
+
+            Call spec.AddGeom(wall, mjtGeom.mjGEOM_BOX, half, Vector3.Zero, Nothing, Nothing, name & "_geom")
+        Next
+
+        Dim ball As MjsBody = spec.AddBody(spec.World, "ball", New Vector3(0.4F, 0.0F, 0.6F))
+
+        ball.HasInertial = True
+        ball.Mass = ballMass
+        ball.FullInertia = New Double() {0.4 * ballMass * ballRadius * ballRadius,
+                                         0.4 * ballMass * ballRadius * ballRadius,
+                                         0.4 * ballMass * ballRadius * ballRadius, 0, 0, 0}
+        ball.CollisionGroup = 4
+        ball.CollisionMask = 7
+
+        Call spec.AddFreeJoint(ball, "ball_free")
+        Call spec.AddGeom(ball, mjtGeom.mjGEOM_SPHERE, New Vector3(CSng(ballRadius), 0, 0))
+
+        Dim m As mjModel = MjApi.mj_compile(spec)
+
+        Call DebugAudit.Check(m.nbody = 16 + 4 + 1, $"nbody = {m.nbody} (duck + 4 walls + ball)")
+
+        Dim d As mjData = MjApi.mj_makeData(m)
+
+        For i As Integer = 1 To 400
+            Call MjApi.mj_step(m, d)
+        Next
+
+        Dim ballId As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "ball")
+
+        Call DebugAudit.Check(ballId > 0, "the ball body exists")
+
+        ' 球落到地面后静止在半径高度
+        Dim ballZ As Double = d.xpos(ballId * 3 + 2)
+
+        Call DebugAudit.Check(Math.Abs(ballZ - ballRadius) < 0.01,
+                              $"the ball rests on the ground (z = {ballZ:F4}, expected {ballRadius})")
+        Call DebugAudit.Check(d.ncon > 0, $"contacts are reported (ncon = {d.ncon})")
+
+        Dim trunk As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "trunk_base")
+        Dim trunkZ As Double = d.xpos(trunk * 3 + 2)
+
+        Call DebugAudit.Check(trunkZ > -0.2, $"the duck does not fall through the floor (z = {trunkZ:F4})")
     End Sub
 
 End Module
