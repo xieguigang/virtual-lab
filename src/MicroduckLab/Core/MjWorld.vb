@@ -224,7 +224,7 @@ Namespace Core
         ' /********************************************************************************/
 
         ''' <summary>把一个控制周期（<c>Decimation</c> 个物理子步）推进完</summary>
-        Public Sub Step()
+        Public Sub Advance()
             Call ApplyControl()
 
             For k As Integer = 1 To SimConstants.Decimation

@@ -276,7 +276,7 @@ Namespace Core
             End If
 
             Call World.SetTargets(m_targets)
-            Call World.Step()
+            Call World.Advance()
 
             m_steps += 1
 
