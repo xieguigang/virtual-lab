@@ -111,8 +111,10 @@ Public Class MjEngineBridge
         Dim bodies(nbody - 1) As Eng.RigidBody3D
 
         For i As Integer = 1 To nbody - 1
+            Console.WriteLine($"[bridge] body {i} {Model.body_name(i)} shape")
             Dim mass As Double = Model.body_mass(i)
             Dim shape As Collision3D.Collider3D = MjCollisionModel.BodyCollider(Model, i)
+            Console.WriteLine($"[bridge] body {i} collider {shape.Kind}")
             Dim friction As Double = FrictionOf(i)
             Dim material As New Eng.PhysicsMaterial(friction, 0.0)
 
