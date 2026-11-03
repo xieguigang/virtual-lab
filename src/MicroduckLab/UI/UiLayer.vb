@@ -352,7 +352,7 @@ Namespace UI
                         "MICRODUCK RL PLAYGROUND",
                         "a port of the pollen-robotics microduck demo",
                         "policies trained with mujoco + mjx",
-                        "physics  PhysicsWorld3D",
+                        "physics  MuJoCo (managed)",
                         "render   Direct3D 11 + direct2d",
                         "ui       hand drawn, no toolkit"
                     }
