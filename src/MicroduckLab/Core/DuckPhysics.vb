@@ -3,6 +3,7 @@ Imports MicroduckLab.Assets
 Imports Eng = Microsoft.VisualBasic.Engine.Physics
 Imports Collision3D = Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports Joints3D = Microsoft.VisualBasic.Engine.Physics.Joints3D
+Imports Microsoft.VisualBasic.Imaging.Drawing3D.Math3D
 
 Namespace Core
 

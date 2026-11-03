@@ -2,6 +2,7 @@ Imports System.Drawing
 Imports System.Numerics
 Imports Microsoft.VisualBasic.Drawing.DirectX.Scene3D
 Imports Microsoft.VisualBasic.Imaging.Drawing3D
+Imports Microsoft.VisualBasic.Imaging.Drawing3D.Math3D
 
 Namespace Assets
 
