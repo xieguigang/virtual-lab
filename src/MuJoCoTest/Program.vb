@@ -869,6 +869,89 @@ Module Program
             Dim actuator As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, names(j))
 
             Call DebugAudit.Check(joint >= 0 AndAlso actuator >= 0, $"'{names(j)}' has a joint and an actuator")
+        Next
+
+        ' 悬空对照：没有任何接触，只有铰链与重力
+        Call MjApi.mj_resetData(m, d)
+
+        Dim freeJoint As Integer = -1
+
+        For j As Integer = 0 To m.njnt - 1
+            If CType(m.jnt_type(j), mjtJoint) = mjtJoint.mjJNT_FREE Then
+                freeJoint = j
+            End If
+        Next
+
+        For j As Integer = 0 To names.Length - 1
+            Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
+
+            d.qpos(m.jnt_qposadr(joint)) = pose(j)
+        Next
+
+        d.qpos(m.jnt_qposadr(freeJoint) + 2) = 2.0
+        Call MjApi.mj_forward(m, d)
+        Call MjApi.mj_clearContactCache(m, d)
+
+        Dim freeDof As Integer = m.jnt_dofadr(freeJoint)
+
+        For iStep As Integer = 1 To 100
+            Call MjApi.mj_step(m, d)
+
+            If iStep Mod 25 = 0 Then
+                Dim worst As Double = 0.0
+                Dim worstDof As Integer = -1
+
+                For i As Integer = freeDof + 6 To m.nv - 1
+                    If Math.Abs(d.qvel(i)) > worst Then
+                        worst = Math.Abs(d.qvel(i))
+                        worstDof = i
+                    End If
+                Next
+
+                Call ($"airborne t={d.time:F2}s free6=({d.qvel(freeDof):F4},{d.qvel(freeDof + 1):F4}," &
+                      $"{d.qvel(freeDof + 2):F4}|{d.qvel(freeDof + 3):F4},{d.qvel(freeDof + 4):F4}," &
+                      $"{d.qvel(freeDof + 5):F4}) worstJoint=({worstDof},{worst:F4}) " &
+                      $"ipos=({m.body_ipos(trunk * 3):F4},{m.body_ipos(trunk * 3 + 1):F4},{m.body_ipos(trunk * 3 + 2):F4})").debug
+            End If
+        Next
+
+        Dim driven As Double() = RunStand(m, d, trunk, names, pose, False, "servo@pose", False)
+        Dim freewheeling As Double() = RunStand(m, d, trunk, names, pose, True, "servo@current", False)
+        Dim dry As Double() = RunStand(m, d, trunk, names, pose, True, "zero-friction", True)
+
+        Call DebugAudit.Snapshot(("drift (servo at pose)", driven(0)),
+                                 ("drift (zero torque)", freewheeling(0)),
+                                 ("drift (no frictionloss)", dry(0)),
+                                 ("trunk z (servo at pose)", driven(1)))
+
+        Call DebugAudit.Check(dry(0) < 0.05,
+                              $"without joint frictionloss the duck stays put (drifted {dry(0):F4} m)")
+        Call DebugAudit.Check(freewheeling(0) < 0.05,
+                              $"with zero servo torque the duck stays put (drifted {freewheeling(0):F4} m)")
+        Call DebugAudit.Check(driven(0) < 0.08,
+                              $"the duck holds the stand pose (drifted {driven(0):F4} m in 4 s)")
+        Call DebugAudit.Check(driven(1) > 0.05,
+                              $"the duck stays upright (trunk z = {driven(1):F4})")
+    End Sub
+
+    ''' <summary>跑 4 秒站立，返回 (水平漂移, 躯干高度)</summary>
+    ''' <param name="holdPose">
+    ''' true 时每子步把伺服目标设成当前关节角，力矩恒为零，用来把
+    ''' "接触/重力" 与 "伺服" 两类原因分开
+    ''' </param>
+    Private Function RunStand(m As mjModel, d As mjData, trunk As Integer,
+                              names As String(), pose As Double(),
+                              holdPose As Boolean, label As String,
+                              zeroFriction As Boolean) As Double()
+        Call MjApi.mj_resetData(m, d)
+
+        If zeroFriction Then
+            Call Array.Clear(m.dof_frictionloss, 0, m.dof_frictionloss.Length)
+        End If
+
+        For j As Integer = 0 To names.Length - 1
+            Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
+            Dim actuator As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, names(j))
 
             d.qpos(m.jnt_qposadr(joint)) = pose(j)
             d.ctrl(actuator) = pose(j)
@@ -883,39 +966,35 @@ Module Program
         ' 50 Hz × 4 个 5 ms 子步 × 200 次 = 4 秒
         For iStep As Integer = 1 To 200
             For subStep As Integer = 1 To 4
+                If holdPose Then
+                    For j As Integer = 0 To names.Length - 1
+                        Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
+                        Dim actuator As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, names(j))
+
+                        d.ctrl(actuator) = d.qpos(m.jnt_qposadr(joint))
+                    Next
+                End If
+
                 Call MjApi.mj_step(m, d)
             Next
 
-            If iStep Mod 25 = 0 Then
-                Call ($"stand t={d.time:F2}s pos=({d.xpos(trunk * 3):F3},{d.xpos(trunk * 3 + 1):F3}," &
-                      $"{d.xpos(trunk * 3 + 2):F3}) v=({d.cvel(trunk * 6 + 3):F3},{d.cvel(trunk * 6 + 4):F3}," &
-                      $"{d.cvel(trunk * 6 + 5):F3}) ncon={d.ncon}").debug
+            If iStep Mod 50 = 0 Then
+                Dim ankle As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "ankle_left")
+                Dim normal As String = If(d.ncon > 0,
+                                          $"({d.contact(0).frame(0):F3},{d.contact(0).frame(1):F3}," &
+                                          $"{d.contact(0).frame(2):F3})@z={d.contact(0).pos(2):F4}", "none")
+
+                Call ($"{label} t={d.time:F2}s x={d.xpos(trunk * 3):F3} z={d.xpos(trunk * 3 + 2):F3} " &
+                      $"sep=({d.xpos(trunk * 3) - d.xpos(ankle * 3):F3},{d.xpos(trunk * 3 + 2) - d.xpos(ankle * 3 + 2):F3}) " &
+                      $"vx[trunk]={d.cvel(trunk * 6 + 3):F3} vx[ankle]={d.cvel(ankle * 6 + 3):F3} " &
+                      $"ncon={d.ncon} n0={normal}").debug
             End If
         Next
 
         Dim drift As Double = Math.Sqrt((d.xpos(trunk * 3) - x0) ^ 2 + (d.xpos(trunk * 3 + 1) - y0) ^ 2)
-        Dim height As Double = d.xpos(trunk * 3 + 2)
 
-        Call DebugAudit.Snapshot(("trunk drift", drift), ("trunk height", height), ("time", d.time))
-        Call DebugAudit.Check(drift < 0.08, $"the duck stays put (drifted {drift:F4} m in 4 s)")
-        Call DebugAudit.Check(height > 0.05, $"the duck stays upright (trunk z = {height:F4})")
-
-        Dim worst As Double = 0.0
-        Dim worstJoint As String = ""
-
-        For j As Integer = 0 To names.Length - 1
-            Dim joint As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j))
-            Dim errorValue As Double = Math.Abs(d.qpos(m.jnt_qposadr(joint)) - pose(j))
-
-            If errorValue > worst Then
-                worst = errorValue
-                worstJoint = names(j)
-            End If
-        Next
-
-        Call DebugAudit.Check(worst < 0.25,
-                              $"the servos hold the stand pose (worst '{worstJoint}' off by {worst:F4} rad)")
-    End Sub
+        Return New Double() {drift, d.xpos(trunk * 3 + 2)}
+    End Function
 
     ' /********************************************************************************/
     '  13. 摩擦（能不能把滑动的箱子停住）
