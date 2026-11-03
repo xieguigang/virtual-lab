@@ -343,8 +343,8 @@ Public Module MjcfParser
 
         Call ParseAsset(spec, root.Element("asset"))
 
-        ' 预处理阶段把 mesh 编译好，后面的 geom 引用它时才有索引可查
-        Call MjcfCompiler.PrepareMeshes(spec)
+        ' 网格的读取推迟到编译期：调用方常常要在 Parse 之后替换
+        ' MjSpec.MeshResolver（MJCF 的 meshdir 与实际资产目录不一致）
 
         Dim worldbody As XElement = root.Element("worldbody")
 

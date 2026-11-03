@@ -225,6 +225,15 @@ Public Module MjcfCompiler
 
     ''' <summary>编译模型；失败时返回 <c>Nothing</c> 并把原因写进 <paramref name="errors"/></summary>
     Public Function Compile(spec As MjSpec, errors As MjErrorBuffer) As mjModel
+        ' 网格资产在编译期才读，这样调用方可以在 Parse 之后设置 MeshResolver
+        For Each mesh As MjsMesh In spec.Meshes
+            Call MjMeshLibrary.Load(spec, mesh, errors)
+        Next
+
+        If errors.HasError Then
+            Return Nothing
+        End If
+
         Dim bodies As List(Of MjsBody) = spec.EnumerateBodies()
         Dim model As New mjModel()
 
