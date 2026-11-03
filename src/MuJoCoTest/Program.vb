@@ -1,3 +1,4 @@
+Imports System.Diagnostics
 Imports System.IO
 Imports System.Numerics
 Imports Microsoft.VisualBasic.ApplicationServices.Debugging
@@ -36,15 +37,15 @@ Module Program
 
         m_robot = Path.Combine(m_root, "src", "MicroduckLab", "Assets", "robot", "mjlab")
 
-        Call CaseModel()
-        Call CaseKinematics()
-        Call CaseFreeFall()
-        Call CasePendulum()
-        Call CaseMassMatrix()
-        Call CaseJacobian()
-        Call CaseStateRoundTrip()
-        Call CaseRay()
-        Call CaseDuckStanding()
+        Call Run("model", AddressOf CaseModel)
+        Call Run("kinematics", AddressOf CaseKinematics)
+        Call Run("free fall", AddressOf CaseFreeFall)
+        Call Run("pendulum", AddressOf CasePendulum)
+        Call Run("mass matrix", AddressOf CaseMassMatrix)
+        Call Run("jacobian", AddressOf CaseJacobian)
+        Call Run("state", AddressOf CaseStateRoundTrip)
+        Call Run("ray", AddressOf CaseRay)
+        Call Run("duck standing", AddressOf CaseDuckStanding)
 
         Dim report As String = Path.Combine(AppContext.BaseDirectory, "mujoco-test-report.html")
         Call DebugAudit.SaveReport(report)
@@ -56,6 +57,28 @@ Module Program
 
         Return If(DebugAudit.FailureCount > 0, 1, 0)
     End Function
+
+    ' /********************************************************************************/
+    '  用例外壳
+    ' /********************************************************************************/
+
+    ''' <summary>跑一个用例，把异常也当作失败记录下来，保证后面的用例还能跑</summary>
+    Private Sub Run(name As String, body As Action)
+        Dim watch As Stopwatch = Stopwatch.StartNew()
+
+        Try
+            Call body()
+        Catch ex As Exception
+            Call DebugAudit.Check(False, $"case '{name}' threw {ex.GetType().Name}: {ex.Message}")
+            Console.WriteLine()
+            Console.WriteLine($"CASE FAILED: {name}")
+            Console.WriteLine(ex.ToString())
+            Console.WriteLine()
+        End Try
+
+        watch.Stop()
+        Call DebugAudit.Mark($"case {name}", $"{watch.ElapsedMilliseconds} ms")
+    End Sub
 
     ' /********************************************************************************/
     '  环境

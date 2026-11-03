@@ -65,11 +65,17 @@ Public Class MjEngineBridge
         Me.Model = model
         m_data = data
 
+        Console.WriteLine("[bridge] configure")
         Call ConfigureWorld()
+        Console.WriteLine("[bridge] bodies")
         Call CreateBodies()
+        Console.WriteLine("[bridge] joints")
         Call CreateJointConstraints()
+        Console.WriteLine("[bridge] actuators")
         Call CreateActuators()
+        Console.WriteLine("[bridge] equalities")
         Call CreateEqualities()
+        Console.WriteLine("[bridge] done")
 
         Hook.Model = model
         Hook.Data = data
