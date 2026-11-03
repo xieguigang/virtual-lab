@@ -1,5 +1,4 @@
 Imports System.Numerics
-Imports Microsoft.VisualBasic
 
 Namespace Geometry
 
@@ -52,10 +51,19 @@ Namespace Geometry
         End Class
 
         ''' <summary>
+        ''' 参与凸包的点数上限。STL 的三角形汤动辄上万个顶点，而碰撞代理用不到这么高的精度：
+        ''' 计算内核的凸-凸检测是 SAT + 面裁剪，面数与顶点数直接决定每对接触的代价。
+        ''' </summary>
+        Public Const MaxInputPoints As Integer = 600
+
+        ''' <summary>面数上限，超过认为算法发散并放弃（防御性保护）</summary>
+        Public Const MaxFaces As Integer = 60000
+
+        ''' <summary>
         ''' 计算点集的凸包；点数不足或退化时返回 <c>Nothing</c>。
         ''' </summary>
         Public Function Compute(points As Vector3(), Optional tolerance As Double = 1.0E-9) As ConvexHullResult
-            Dim unique As List(Of Vector3) = Weld(points, tolerance)
+            Dim unique As List(Of Vector3) = Decimate(Weld(points, tolerance), MaxInputPoints)
 
             If unique.Count < 4 Then
                 Return Nothing
@@ -70,7 +78,7 @@ Namespace Geometry
 
             Dim eps As Double = Math.Max(tolerance, scale * 1.0E-7)
 
-            Call $"  hull: {points.Length} raw → {unique.Count} welded, scale={scale:E2}, eps={eps:E2}".debug
+            Call $"  hull: {points.Length} raw → {unique.Count} hull points, extent={scale:E2}, eps={eps:E2}".debug
 
             ' ---- 1. 初始四面体 ----
             Dim i0 As Integer = 0
@@ -147,7 +155,13 @@ Namespace Geometry
                     Continue For
                 End If
 
-                Call Insert(faces, unique, i, eps)
+                Call Insert(faces, unique, i, eps, scale)
+
+                If faces.Count > MaxFaces Then
+                    Call $"  hull: diverged at point {i} with {faces.Count} faces — abandoned".debug
+
+                    Return Nothing
+                End If
 
                 If i Mod 200 = 0 Then
                     Dim alive As Integer = 0
@@ -167,7 +181,8 @@ Namespace Geometry
         '  插入一个点
         ' /********************************************************************************/
 
-        Private Sub Insert(faces As List(Of Face), points As List(Of Vector3), index As Integer, eps As Double)
+        Private Sub Insert(faces As List(Of Face), points As List(Of Vector3), index As Integer,
+                           eps As Double, scale As Double)
             Dim p As Vector3 = points(index)
             Dim visible As Boolean() = New Boolean(faces.Count - 1) {}
             Dim any As Boolean = False
@@ -223,6 +238,20 @@ Namespace Geometry
             If horizon.Count = 0 Then
                 Return
             End If
+
+            ' 退化保护：如果某条视界边与该点构成的三角形面积趋近于零，说明这个点
+            ' 正好落在已有表面上（STL 的平面区域与棱线附近很常见）。此时强行缝合会
+            ' 生成零面积面，而零面积面没有可靠的朝向，会污染之后所有的可见性判断：
+            ' 实测 hip_l 的网格在第 400 个点之后面数失控、内存持续增长直至进程被杀死。
+            ' 直接忽略这个点是安全的——它不会扩大凸包。
+            For Each edge In horizon
+                Dim side1 As Vector3 = points(edge.B) - points(edge.A)
+                Dim side2 As Vector3 = p - points(edge.A)
+
+                If Vector3.Cross(side1, side2).Length() <= eps * Math.Max(scale, 1.0) Then
+                    Return
+                End If
+            Next
 
             For f As Integer = 0 To faces.Count - 1
                 If visible(f) Then
@@ -396,6 +425,81 @@ Namespace Geometry
             Next
 
             Return result
+        End Function
+
+        ''' <summary>
+        ''' 按包围盒网格抽稀：每个格子保留一个代表点，并始终保留六个轴向极值点。
+        ''' </summary>
+        ''' <remarks>
+        ''' 抽稀的代价是棱角会略微变"圆"，但碰撞代理本来就只要求量级正确；
+        ''' 收益是凸包的点数、面数以及接触检测的代价都被限死。
+        ''' 格子尺寸从 <c>包围盒对角线 / 24</c> 开始，每次放大 1.4 倍直到点数达标。
+        ''' </remarks>
+        Private Function Decimate(points As List(Of Vector3), maxPoints As Integer) As List(Of Vector3)
+            If points Is Nothing OrElse points.Count <= maxPoints Then
+                Return points
+            End If
+
+            ' 六个轴向极值点必须保留，否则盒子类的形状会被削掉一个角
+            Dim extremes As New List(Of Vector3)(6)
+            Dim axes As Vector3() = {Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY,
+                                     Vector3.UnitZ, -Vector3.UnitZ}
+
+            For Each axis In axes
+                Dim best As Vector3 = points(0)
+                Dim bestValue As Double = Vector3.Dot(best, axis)
+
+                For Each p In points
+                    Dim value As Double = Vector3.Dot(p, axis)
+
+                    If value > bestValue Then
+                        bestValue = value
+                        best = p
+                    End If
+                Next
+
+                Call extremes.Add(best)
+            Next
+
+            Dim extent As Double = Extent(points)
+
+            If extent < 1.0E-12 Then
+                Return points
+            End If
+
+            Dim cell As Double = extent / 24.0
+
+            For attempt As Integer = 1 To 12
+                Dim buckets As New Dictionary(Of (X As Long, Y As Long, Z As Long), Vector3)()
+
+                For Each p In points
+                    Dim key As (X As Long, Y As Long, Z As Long) =
+                        (CLng(Math.Floor(p.X / cell)), CLng(Math.Floor(p.Y / cell)), CLng(Math.Floor(p.Z / cell)))
+
+                    If Not buckets.ContainsKey(key) Then
+                        buckets(key) = p
+                    End If
+                Next
+
+                If buckets.Count + extremes.Count <= maxPoints Then
+                    Dim result As New List(Of Vector3)(buckets.Count + extremes.Count)
+
+                    Call result.AddRange(buckets.Values)
+
+                    For Each p In extremes
+                        If Not result.Contains(p) Then
+                            Call result.Add(p)
+                        End If
+                    Next
+
+                    Return result
+                End If
+
+                cell *= 1.4
+            Next
+
+            ' 抽稀失败（极端形状）：宁可算一个大一点的凸包，也不能返回空
+            Return points
         End Function
 
         Private Function Extent(points As List(Of Vector3)) As Double

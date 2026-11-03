@@ -1,5 +1,4 @@
 Imports System.Numerics
-Imports Microsoft.VisualBasic
 Imports Collision3D = Microsoft.VisualBasic.Engine.Physics.Collision3D
 Imports EngVec = Microsoft.VisualBasic.Engine.Physics.Vector3
 Imports Geometry = MuJoCo.Geometry
