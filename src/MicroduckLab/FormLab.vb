@@ -1,23 +1,22 @@
 ﻿Imports System.Collections.Concurrent
-Imports System.Diagnostics
-Imports System.Drawing
 Imports System.Numerics
-Imports System.Threading.Tasks
-Imports System.Windows.Forms
 Imports MicroduckLab.Assets
 Imports MicroduckLab.Audio
 Imports MicroduckLab.Core
 Imports MicroduckLab.Inputs
 Imports MicroduckLab.Render
 Imports MicroduckLab.UI
-Imports DxWin = Microsoft.VisualBasic.Drawing.DirectX
 Imports DxArgs = Microsoft.VisualBasic.Drawing.DirectX.DxRenderEventArgs
+Imports DxWin = Microsoft.VisualBasic.Drawing.DirectX
 
 ''' <summary>
 ''' The window of the playground: one directx canvas that fills it, the 2d shell
 ''' drawn on top of every frame and the input of the keyboard, the mouse and the
 ''' pad routed into the session.
 ''' </summary>
+''' <remarks>
+''' https://huggingface.co/spaces/pollen-robotics/microduck-simulator/tree/main
+''' </remarks>
 Public Class FormLab
 
     Private ReadOnly m_canvas As New DxWin.DxCanvas()

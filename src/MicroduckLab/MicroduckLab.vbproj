@@ -8,6 +8,7 @@
     <MyType>WindowsForms</MyType>
     <UseWPF>True</UseWPF>
     <Platforms>AnyCPU;x64</Platforms>
+    <Description>Translation from https://huggingface.co/spaces/pollen-robotics/microduck-simulator/tree/main</Description>
   </PropertyGroup>
 
   <ItemGroup>
