@@ -65,17 +65,14 @@ Public Class MjEngineBridge
         Me.Model = model
         m_data = data
 
-        Call $"bridge: configure world (nbody={model.nbody}, ngeom={model.ngeom})".debug
         Call ConfigureWorld()
-        Call "bridge: create bodies".debug
         Call CreateBodies()
-        Call "bridge: create joint constraints".debug
         Call CreateJointConstraints()
-        Call "bridge: create actuators".debug
         Call CreateActuators()
-        Call "bridge: create equalities".debug
         Call CreateEqualities()
-        Call "bridge: done".debug
+
+        Call ($"bridge ready: {Model.nbody} bodies, {Model.nv} dofs, {Model.ngeom} geoms, " &
+              $"{Model.nactuator} actuators, {StaticGeoms.Count} static geoms").debug
 
         Hook.Model = model
         Hook.Data = data
@@ -111,10 +108,8 @@ Public Class MjEngineBridge
         Dim bodies(nbody - 1) As Eng.RigidBody3D
 
         For i As Integer = 1 To nbody - 1
-            Call $"bridge: body[{i}] '{Model.body_name(i)}' collider".debug
             Dim mass As Double = Model.body_mass(i)
             Dim shape As Collision3D.Collider3D = MjCollisionModel.BodyCollider(Model, i)
-            Call $"bridge: body[{i}] collider = {shape.Kind}".debug
             Dim friction As Double = FrictionOf(i)
             Dim material As New Eng.PhysicsMaterial(friction, 0.0)
 

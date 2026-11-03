@@ -274,15 +274,11 @@ Public Module MjCollisionModel
     Public Function BodyCollider(model As mjModel, body As Integer) As Collision3D.Collider3D
         Dim points As Vector3() = BodyPoints(model, body)
 
-        Call $"hull[{body}] '{model.body_name(body)}' collects {points.Length} points".debug
-
         If points.Length < 4 Then
             Return New Collision3D.SphereCollider3D(0.0005)
         End If
 
         Dim hull As Geometry.ConvexHullResult = Geometry.ConvexHull3D.Compute(points)
-
-        Call $"hull[{body}] result = {If(hull Is Nothing, "nothing", $"{hull.Vertices.Length}v/{hull.Faces.Length}f")}".debug
 
         If hull Is Nothing OrElse hull.IsEmpty Then
             ' 所有点在一条线上或一个面上：退化成一个薄盒，保证仍有碰撞体积

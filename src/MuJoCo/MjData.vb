@@ -322,7 +322,8 @@ Public Class mjData
 
         subtree_com = Alloc(m.nbody * 3)
         cdof = Alloc(m.nv * 6)
-        cinert = Alloc(m.nv * 10)
+        ' cinert 与 crb 都是"每个 body 一个 10 元组"，不是每个自由度
+        cinert = Alloc(m.nbody * 10)
         crb = Alloc(m.nbody * 10)
         Me.M = Alloc(m.nv * m.nv)
         qLD = Alloc(m.nv * m.nv)

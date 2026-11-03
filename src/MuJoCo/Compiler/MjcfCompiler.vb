@@ -632,6 +632,8 @@ Public Module MjcfCompiler
             model.body_dofadr(i) = dof
             model.body_dofnum(i) = 0
 
+            Dim dofStart As Integer = dof
+
             For Each joint As MjsJoint In bodies(i).Joints
                 model.jnt_type(j) = CInt(joint.Type)
                 model.jnt_bodyid(j) = i
@@ -683,6 +685,10 @@ Public Module MjcfCompiler
                 qposAdr += mj_jntQposDim(joint.Type)
                 j += 1
             Next
+
+            ' body 的自由度范围：前面忘了写回 body_dofnum，结果 cdof、cvel 与
+            ' 质量矩阵全都退化成 0——表现为"自由落体不动"、"雅可比全零"
+            model.body_dofnum(i) = dof - dofStart
         Next
 
         ' ---- 没有 <inertial> 的 body：按 geom 估算 ----'

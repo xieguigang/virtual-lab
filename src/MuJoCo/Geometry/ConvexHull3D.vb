@@ -78,8 +78,6 @@ Namespace Geometry
 
             Dim eps As Double = Math.Max(tolerance, scale * 1.0E-7)
 
-            Call $"  hull: {points.Length} raw → {unique.Count} hull points, extent={scale:E2}, eps={eps:E2}".debug
-
             ' ---- 1. 初始四面体 ----
             Dim i0 As Integer = 0
             Dim i1 As Integer = -1
@@ -157,20 +155,12 @@ Namespace Geometry
 
                 Call Insert(faces, unique, i, eps, scale)
 
+                ' 防御性上限：算法本身不应该发散，但输入含 NaN 或极退化几何时
+                ' 宁可放弃凸包（调用方回退到包围盒），也不能把进程的内存吃光
                 If faces.Count > MaxFaces Then
-                    Call $"  hull: diverged at point {i} with {faces.Count} faces — abandoned".debug
+                    Call $"convex hull diverged at point {i} with {faces.Count} faces — abandoned".debug
 
                     Return Nothing
-                End If
-
-                If i Mod 200 = 0 Then
-                    Dim alive As Integer = 0
-
-                    For f As Integer = 0 To faces.Count - 1
-                        If faces(f).Alive Then alive += 1
-                    Next
-
-                    Call $"  hull: point {i}/{count}, faces {faces.Count} ({alive} alive)".debug
                 End If
             Next
 
@@ -461,13 +451,13 @@ Namespace Geometry
                 Call extremes.Add(best)
             Next
 
-            Dim extent As Double = Extent(points)
+            Dim diagonal As Double = Extent(points)
 
-            If extent < 1.0E-12 Then
+            If diagonal < 1.0E-12 Then
                 Return points
             End If
 
-            Dim cell As Double = extent / 24.0
+            Dim cell As Double = diagonal / 24.0
 
             For attempt As Integer = 1 To 12
                 Dim buckets As New Dictionary(Of (X As Long, Y As Long, Z As Long), Vector3)()

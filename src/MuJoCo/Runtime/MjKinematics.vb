@@ -51,6 +51,8 @@ Public Module MjKinematics
             For k As Integer = 0 To count - 1
                 Dim j As Integer = start + k
                 Dim adr As Integer = m.jnt_qposadr(j)
+                Dim anchorLocal As New Vector3(CSng(m.jnt_pos(j * 3)), CSng(m.jnt_pos(j * 3 + 1)),
+                                               CSng(m.jnt_pos(j * 3 + 2)))
 
                 Select Case CType(m.jnt_type(j), mjtJoint)
                     Case mjtJoint.mjJNT_FREE
@@ -58,13 +60,23 @@ Public Module MjKinematics
                                                CSng(d.qpos(adr + 2)))
                         quat = MjMath.Quat(d.qpos, adr + 3)
 
-                    Case mjtJoint.mjJNT_BALL
-                        quat = MjMath.Mul(quat, MjMath.Quat(d.qpos, adr))
+                    Case mjtJoint.mjJNT_BALL, mjtJoint.mjJNT_HINGE
+                        ' 关节绕**锚点**旋转，锚点在世界系里固定：
+                        '   锚点 = xpos + R·jnt_pos（旋转前）
+                        '   xpos' = 锚点 − R'·jnt_pos（旋转后）
+                        ' 漏掉这一步时 body 帧的原点不会移动，锚点离开质心的关节
+                        ' （例如单摆）就变成了"原地自转"，角速度与角度完全对不上。
+                        Dim anchor As Vector3 = position + MjMath.Rotate(quat, anchorLocal)
 
-                    Case mjtJoint.mjJNT_HINGE
-                        Dim axis As New Vector3(CSng(m.jnt_axis(j * 3)), CSng(m.jnt_axis(j * 3 + 1)),
-                                                CSng(m.jnt_axis(j * 3 + 2)))
-                        quat = MjMath.Mul(quat, MjMath.AxisAngle(axis, d.qpos(adr)))
+                        If CType(m.jnt_type(j), mjtJoint) = mjtJoint.mjJNT_BALL Then
+                            quat = MjMath.Mul(quat, MjMath.Quat(d.qpos, adr))
+                        Else
+                            Dim axis As New Vector3(CSng(m.jnt_axis(j * 3)), CSng(m.jnt_axis(j * 3 + 1)),
+                                                    CSng(m.jnt_axis(j * 3 + 2)))
+                            quat = MjMath.Mul(quat, MjMath.AxisAngle(axis, d.qpos(adr)))
+                        End If
+
+                        position = anchor - MjMath.Rotate(quat, anchorLocal)
 
                     Case mjtJoint.mjJNT_SLIDE
                         Dim axis2 As New Vector3(CSng(m.jnt_axis(j * 3)), CSng(m.jnt_axis(j * 3 + 1)),

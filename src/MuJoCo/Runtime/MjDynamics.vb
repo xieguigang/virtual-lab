@@ -54,18 +54,25 @@ Public Module MjDynamics
                                                      m.body_inertia(i * 3), m.body_inertia(i * 3 + 1),
                                                      m.body_inertia(i * 3 + 2))
 
+            ' 6×6 按"四个 3×3 块并排"存放，每块占 9 个元素：
+            '   块(0,0) 平移 0   → 0..8    块(0,1) 平移 9   → 9..17
+            '   块(1,0) 平移 18  → 18..26  块(1,1) 平移 27  → 27..35
+            ' 每个块内部是行主序的 3×3，元素 (r,c) 位于 offset + start + r*3 + c。
+            ' 注意四块的平移必须是 0/9/18/27——写成 0/3/9/18 会让块互相重叠，
+            ' 表现为质量矩阵不对称（实测 M[1][0]=总质量而 M[0][1]=0）。
+
             ' 上左 3×3：世界转动惯量
             result(offset + 0) = local.XX
             result(offset + 1) = local.XY
             result(offset + 2) = local.XZ
-            result(offset + 3 * 1 + 0) = local.XY
-            result(offset + 3 * 1 + 1) = local.YY
-            result(offset + 3 * 1 + 2) = local.YZ
-            result(offset + 3 * 2 + 0) = local.XZ
-            result(offset + 3 * 2 + 1) = local.YZ
-            result(offset + 3 * 2 + 2) = local.ZZ
+            result(offset + 3) = local.XY
+            result(offset + 4) = local.YY
+            result(offset + 5) = local.YZ
+            result(offset + 6) = local.XZ
+            result(offset + 7) = local.YZ
+            result(offset + 8) = local.ZZ
 
-            ' 下右 3×3：m·E
+            ' 下右 3×3：m·E（块内行主序，对角线是 0/4/8）
             result(offset + 27) = mass
             result(offset + 31) = mass
             result(offset + 35) = mass
@@ -96,9 +103,9 @@ Public Module MjDynamics
 
         ' 取出子块的四个 3×3
         Dim a As Double() = Block(buffer, co, 0)
-        Dim b As Double() = Block(buffer, co, 3)
-        Dim bt As Double() = Block(buffer, co, 9)
-        Dim mm As Double() = Block(buffer, co, 18)
+        Dim b As Double() = Block(buffer, co, 9)
+        Dim bt As Double() = Block(buffer, co, 18)
+        Dim mm As Double() = Block(buffer, co, 27)
 
         Dim sd As Double() = Skew(d)
 
@@ -126,9 +133,9 @@ Public Module MjDynamics
         Next
 
         Call AddBlock(buffer, po, 0, ap)
-        Call AddBlock(buffer, po, 3, bp)
-        Call AddBlock(buffer, po, 9, Transpose(bp))
-        Call AddBlock(buffer, po, 18, mm)
+        Call AddBlock(buffer, po, 9, bp)
+        Call AddBlock(buffer, po, 18, Transpose(bp))
+        Call AddBlock(buffer, po, 27, mm)
     End Sub
 
     Private Function Block(buffer As Double(), offset As Integer, start As Integer) As Double()
@@ -211,11 +218,11 @@ Public Module MjDynamics
 
             For a As Integer = 0 To count - 1
                 Dim dofA As Integer = start + a
-                Dim sa As Double() = MotionAt(d, dofA, com)
+                Dim sa As Double() = MotionAt(m, d, dofA, com)
 
                 For b As Integer = 0 To count - 1
                     Dim dofB As Integer = start + b
-                    Dim value As Double = Quadratic(inertia, i, sa, MotionAt(d, dofB, com))
+                    Dim value As Double = Quadratic(inertia, i, sa, MotionAt(m, d, dofB, com))
 
                     d.M(dofA * nv + dofB) = value
                 Next
@@ -224,7 +231,7 @@ Public Module MjDynamics
                 Dim e As Integer = m.dof_parentid(dofA)
 
                 While e >= 0
-                    Dim value As Double = Quadratic(inertia, i, sa, MotionAt(d, e, com))
+                    Dim value As Double = Quadratic(inertia, i, sa, MotionAt(m, d, e, com))
 
                     d.M(dofA * nv + e) = value
                     d.M(e * nv + dofA) = value
@@ -241,13 +248,22 @@ Public Module MjDynamics
         Next
     End Sub
 
-    ''' <summary>自由度 <paramref name="dof"/> 在参考点 <paramref name="point"/> 处的运动向量 [ω; v]</summary>
-    Private Function MotionAt(d As mjData, dof As Integer, point As Vector3) As Double()
+    ''' <summary>
+    ''' 自由度 <paramref name="dof"/> 在参考点 <paramref name="point"/> 处的运动向量 <c>[ω; v]</c>。
+    ''' </summary>
+    ''' <remarks>
+    ''' <c>cdof</c> 的线速度是相对**该自由度所属刚体**的质心的。CRBA 要把所有量
+    ''' 表达在同一个参考点（当前 body 的质心）上，所以祖先自由度的线速度必须
+    ''' 补上 <c>ω × (point − com_owner)</c>；漏掉这一项时质量矩阵不再对称
+    ''' （实测最大不对称 0.74）。
+    ''' </remarks>
+    Private Function MotionAt(m As mjModel, d As mjData, dof As Integer, point As Vector3) As Double()
         Dim omega As New Vector3(CSng(d.cdof(dof * 6 + 0)), CSng(d.cdof(dof * 6 + 1)), CSng(d.cdof(dof * 6 + 2)))
         Dim linear As New Vector3(CSng(d.cdof(dof * 6 + 3)), CSng(d.cdof(dof * 6 + 4)), CSng(d.cdof(dof * 6 + 5)))
+        Dim owner As Integer = m.dof_bodyid(dof)
 
-        ' cdof 的线速度是相对该刚体质心的；换到 point 处再加 ω × (point − com)
-        ' 调用方传入的 point 就是该刚体的质心，所以这里只需直接使用
+        linear += Vector3.Cross(omega, point - MjKinematics.ComOf(d, owner))
+
         Return New Double() {omega.X, omega.Y, omega.Z, linear.X, linear.Y, linear.Z}
     End Function
 
@@ -260,9 +276,9 @@ Public Module MjDynamics
         Dim v2 As New Vector3(CSng(s2(3)), CSng(s2(4)), CSng(s2(5)))
 
         Dim aw As Vector3 = MulBlock(inertia, offset + 0, w2)
-        Dim bv As Vector3 = MulBlock(inertia, offset + 3, v2)
-        Dim btw As Vector3 = MulBlock(inertia, offset + 9, w2)
-        Dim mv As Vector3 = MulBlock(inertia, offset + 18, v2)
+        Dim bv As Vector3 = MulBlock(inertia, offset + 9, v2)
+        Dim btw As Vector3 = MulBlock(inertia, offset + 18, w2)
+        Dim mv As Vector3 = MulBlock(inertia, offset + 27, v2)
 
         Return Vector3.Dot(w1, aw) + Vector3.Dot(w1, bv) + Vector3.Dot(v1, btw) + Vector3.Dot(v1, mv)
     End Function
@@ -337,7 +353,7 @@ Public Module MjDynamics
 
             For k As Integer = 0 To count - 1
                 Dim dof As Integer = start + k
-                Dim s As Double() = MotionAt(d, dof, MjKinematics.ComOf(d, i))
+                Dim s As Double() = MotionAt(m, d, dof, MjKinematics.ComOf(d, i))
                 Dim rate As Double = d.qvel(dof)
 
                 Dim sw As New Vector3(CSng(s(0)), CSng(s(1)), CSng(s(2)))
@@ -371,12 +387,12 @@ Public Module MjDynamics
             Dim w As New Vector3(CSng(velocity(i * 6 + 0)), CSng(velocity(i * 6 + 1)), CSng(velocity(i * 6 + 2)))
             Dim u As New Vector3(CSng(velocity(i * 6 + 3)), CSng(velocity(i * 6 + 4)), CSng(velocity(i * 6 + 5)))
 
-            Dim n As Vector3 = MulBlock(inertia, offset + 0, a) + MulBlock(inertia, offset + 3, al)
-            Dim f As Vector3 = MulBlock(inertia, offset + 9, a) + MulBlock(inertia, offset + 18, al)
+            Dim n As Vector3 = MulBlock(inertia, offset + 0, a) + MulBlock(inertia, offset + 9, al)
+            Dim f As Vector3 = MulBlock(inertia, offset + 18, a) + MulBlock(inertia, offset + 27, al)
 
             ' v ×* (F v)
-            Dim momentumN As Vector3 = MulBlock(inertia, offset + 0, w) + MulBlock(inertia, offset + 3, u)
-            Dim momentumF As Vector3 = MulBlock(inertia, offset + 9, w) + MulBlock(inertia, offset + 18, u)
+            Dim momentumN As Vector3 = MulBlock(inertia, offset + 0, w) + MulBlock(inertia, offset + 9, u)
+            Dim momentumF As Vector3 = MulBlock(inertia, offset + 18, w) + MulBlock(inertia, offset + 27, u)
 
             n += Vector3.Cross(w, momentumN) + Vector3.Cross(u, momentumF)
             f += Vector3.Cross(w, momentumF)
@@ -397,7 +413,7 @@ Public Module MjDynamics
 
             For k As Integer = 0 To count - 1
                 Dim dof As Integer = start + k
-                Dim s As Double() = MotionAt(d, dof, MjKinematics.ComOf(d, i))
+                Dim s As Double() = MotionAt(m, d, dof, MjKinematics.ComOf(d, i))
 
                 d.qfrc_bias(dof) += s(0) * force(i * 6 + 0) + s(1) * force(i * 6 + 1) + s(2) * force(i * 6 + 2) +
                                     s(3) * force(i * 6 + 3) + s(4) * force(i * 6 + 4) + s(5) * force(i * 6 + 5)
