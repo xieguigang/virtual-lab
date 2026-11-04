@@ -45,6 +45,7 @@ Namespace Core
         Private ReadOnly m_actuatorIndex As Integer()
         Private ReadOnly m_qposAdr As Integer()
         Private ReadOnly m_dofAdr As Integer()
+        Private ReadOnly m_jointIndex As Integer()
         Private ReadOnly m_leftAnkleNode As Integer
         Private ReadOnly m_rightAnkleNode As Integer
         Private m_trunkBody As Integer
@@ -133,11 +134,13 @@ Namespace Core
             Dim actuators(Skeleton.Driven.Count - 1) As Integer
             Dim qpos(Skeleton.Driven.Count - 1) As Integer
             Dim dof(Skeleton.Driven.Count - 1) As Integer
+            Dim joints(Skeleton.Driven.Count - 1) As Integer
 
             m_nodeBody = nodes.ToArray()
             m_actuatorIndex = actuators
             m_qposAdr = qpos
             m_dofAdr = dof
+            m_jointIndex = joints
 
             Call Build()
         End Sub
@@ -178,6 +181,12 @@ Namespace Core
 
                 m_qposAdr(j) = Model.jnt_qposadr(joint)
                 m_dofAdr(j) = Model.jnt_dofadr(joint)
+                m_jointIndex(j) = joint
+
+                ' 关节行程只在 kinematics.json 里：MJCF 的 <joint> 一个 range 都没写。
+                ' 不补回模型的话关节是无限制的，伺服拿到一个 6 rad 的目标就能让它
+                ' 转好几圈，反作用力矩把整机掀翻（实测动作尖峰 6.3 → 躯干连续翻滚）
+                Call ApplyJointRange(joint, SimConstants.JointNames(j))
             Next
 
             m_trunkBody = MjApi.mj_name2id(Model, mjtObj.mjOBJ_BODY, DuckSkeleton.TrunkName)
@@ -196,6 +205,56 @@ Namespace Core
             Call CountColliders()
             Call Spawn()
         End Sub
+
+        ''' <summary>
+        ''' 把 <c>kinematics.json</c> 的关节行程写回模型。
+        ''' </summary>
+        ''' <remarks>
+        ''' MJCF 的 <c>&lt;joint&gt;</c> 没有写 <c>range</c>（duck 的模型在装配时就没写），
+        ''' 行程只存在于 <c>kinematics.json</c> 的 <c>"range"</c> 字段里。
+        ''' 模型不带行程时，<c>MjActuatorHook</c> 的越界约束不会生效，
+        ''' 一个 6 rad 的动作目标就能让关节转上一整圈。
+        ''' </remarks>
+        Private Sub ApplyJointRange(joint As Integer, jointName As String)
+            Dim node As SkeletonNode = FindJointNode(jointName)
+
+            If node Is Nothing OrElse node.JointLimits Is Nothing OrElse node.JointLimits.Length < 2 Then
+                Return
+            End If
+
+            If node.JointLimits(0) >= node.JointLimits(1) Then
+                Return
+            End If
+
+            Model.jnt_limited(joint) = True
+            Model.jnt_range(joint * 2 + 0) = node.JointLimits(0)
+            Model.jnt_range(joint * 2 + 1) = node.JointLimits(1)
+        End Sub
+
+        ''' <summary>按关节名找渲染节点（<c>SkeletonNode.Name</c> 是 body 名，不是关节名）</summary>
+        Private Function FindJointNode(jointName As String) As SkeletonNode
+            For Each candidate As SkeletonNode In Skeleton.Nodes
+                If candidate.JointName IsNot Nothing AndAlso
+                   String.Equals(candidate.JointName, jointName, StringComparison.Ordinal) Then
+                    Return candidate
+                End If
+            Next
+
+            Return Nothing
+        End Function
+
+        ''' <summary>
+        ''' 策略关节 <paramref name="index"/> 的行程，来自 <c>kinematics.json</c>；没有时返回 <c>Nothing</c>。
+        ''' </summary>
+        Public Function JointLimits(index As Integer) As Double()
+            If index < 0 OrElse index >= SimConstants.NumJoints Then
+                Return Nothing
+            End If
+
+            Dim node As SkeletonNode = FindJointNode(SimConstants.JointNames(index))
+
+            Return If(node Is Nothing, Nothing, node.JointLimits)
+        End Function
 
         Private Function IndexOfNode(name As String) As Integer
             For i As Integer = 0 To Skeleton.Nodes.Count - 1

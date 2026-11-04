@@ -337,6 +337,7 @@ Namespace UI
                         "M                legs <-> rollers",
                         "R                sit / stand (crouch on rollers)",
                         "Q / E / F        kick left / right / alternate",
+                        "F9               dump observation + action to CSV",
                         "MOUSE            drag to orbit, wheel to zoom",
                         "GAMEPAD          left stick walks, right stick orbits"
                     }
@@ -459,7 +460,7 @@ Namespace UI
             Next
 
             ' the hints, bottom centre
-            Dim hints As String = "WASD WALK   M SHAPE   R SIT   Q/E KICK   G PICK   SPACE RESET   C CAM   ESC MENU"
+            Dim hints As String = "WASD WALK   M SHAPE   R SIT   Q/E KICK   G PICK   SPACE RESET   C CAM   F9 DUMP   ESC MENU"
 
             Call g.DrawString(hints, m_small, m_dimBrush, size.Width * 0.5F - 250, size.Height - 26)
 

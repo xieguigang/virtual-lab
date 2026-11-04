@@ -263,6 +263,18 @@ Public Class MjsActuator
     Public Property Kp As Double = 0.0
     ''' <summary>速度伺服的阻尼</summary>
     Public Property Kv As Double = 0.0
+    ''' <summary>
+    ''' 阻尼比（MJCF 的 <c>dampratio</c>），0 表示未指定。
+    ''' </summary>
+    ''' <remarks>
+    ''' MuJoCo 允许用阻尼比代替 <c>kv</c>：指定 <c>dampratio</c> 时
+    ''' <c>kv = 2·dampratio·√(kp·M)</c>（<c>M</c> 是执行器的等效惯量，缺省 1），
+    ''' 且优先于显式写出的 <c>kv</c>。
+    ''' duck 的 <c>chosen_actuator</c> 只写了 <c>dampratio="1"</c>，
+    ''' 漏掉这一步会让每个位置伺服变成零阻尼的弹簧——实测站立 0.4 s 内
+    ''' 角速度就冲到 2 rad/s，随后整机翻倒并躺在地上打转。
+    ''' </remarks>
+    Public Property Dampratio As Double = 0.0
     ''' <summary>力的缩放（<c>gear</c>）</summary>
     Public Property Gear As Double = 1.0
 

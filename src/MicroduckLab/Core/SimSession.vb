@@ -34,6 +34,45 @@ Namespace Core
         ''' <summary>the shape that is loaded right now</summary>
         Public Property Shape As Locomotion = Locomotion.Legs
 
+        ' ── the observation log ─────────────────────────────────────────────
+        Private m_dumpEnabled As Boolean
+        Private m_dumpPath As String
+
+        ''' <summary>
+        ''' 把每个控制周期的观测与动作写进 CSV（热键 F9）。
+        ''' </summary>
+        ''' <remarks>
+        ''' 打开后写到 <see cref="DumpPath"/>；每次切换 shape 重建世界时状态会保留。
+        ''' 文件里每行是"这一步送进网络的 61 维观测 + 网络给出的 14 维动作"，
+        ''' 可以直接和训练时的分布对照。
+        ''' </remarks>
+        Public Property DumpObservation As Boolean
+            Get
+                Return m_dumpEnabled
+            End Get
+            Set(value As Boolean)
+                m_dumpEnabled = value
+
+                If Observer IsNot Nothing Then
+                    Observer.DumpEnabled = value
+                End If
+            End Set
+        End Property
+
+        ''' <summary>CSV 的输出路径，<c>Nothing</c> 时用输出目录下的 observation-dump.csv</summary>
+        Public Property DumpPath As String
+            Get
+                Return m_dumpPath
+            End Get
+            Set(value As String)
+                m_dumpPath = value
+
+                If Observer IsNot Nothing Then
+                    Observer.DumpPath = value
+                End If
+            End Set
+        End Property
+
         ' ── the machine state ───────────────────────────────────────────────
         Private ReadOnly m_lastAction As Double() = New Double(SimConstants.NumJoints - 1) {}
         Private ReadOnly m_targets As Double() = New Double(SimConstants.NumJoints - 1) {}
@@ -128,8 +167,6 @@ Namespace Core
             Call Trace("loading the policies")
             Call Policies.LoadLegs(AddressOf Trace)
 
-            Observer = New ObservationBuilder(World)
-
             m_booted = True
 
             Call Capture()
@@ -141,7 +178,10 @@ Namespace Core
 
             World = New MjWorld(Skeleton, AssetPath.RobotFile(MjcfFile(Shape)),
                                 AssetPath.MeshDirectory, Scene)
-            Observer = New ObservationBuilder(World)
+            Observer = New ObservationBuilder(World) With {
+                .DumpEnabled = m_dumpEnabled,
+                .DumpPath = m_dumpPath
+            }
         End Sub
 
         Public Shared Function KinematicsFile(loco As Locomotion) As String
@@ -245,10 +285,16 @@ Namespace Core
             ' hold the current pose while the duck settles after a fall
             World.Frozen = machine.Recovery = RecoveryState.Settle
 
+            ' 冻结（跌倒后的 Settle）时不跑推理，观测缓冲还是上一步的内容，
+            ' 这时候不能写日志，否则 CSV 里会出现"同一个观测配两个动作"的错行
+            Dim observed As Boolean = False
+
             If Not World.Frozen Then
                 Dim command As Double() = ComposeCommand()
                 Dim observation As Double() = Observer.Build(m_lastAction, command)
                 Dim session As PolicySession = Policies.Active(machine.Mode, machine.Loco, machine.Recovery)
+
+                observed = True
 
                 If session IsNot Nothing Then
                     Dim action As Double() = session.Run(observation)
@@ -267,12 +313,31 @@ Namespace Core
                     If finite Then
                         For j As Integer = 0 To SimConstants.NumJoints - 1
                             m_lastAction(j) = action(j)
-                            m_targets(j) = SimConstants.DefaultPose(j) + action(j) * Policies.ActionScale
+
+                            ' 动作偶尔会冒出 6 rad 的尖峰（观测里 act_* 的极值），
+                            ' 直接送进伺服会让关节追好几圈，反作用力矩把整机掀翻。
+                            ' 按 kinematics.json 的行程夹住——这也是旧 JointDriveHook
+                            ' 的 Lower/Upper 在做的事。
+                            Dim target As Double = SimConstants.DefaultPose(j) + action(j) * Policies.ActionScale
+                            Dim limits As Double() = World.JointLimits(j)
+
+                            If limits IsNot Nothing AndAlso limits.Length >= 2 Then
+                                target = Phys.Clamp(target, limits(0), limits(1))
+                            End If
+
+                            m_targets(j) = target
                         Next
                     End If
 
                     m_lastInferenceMs = session.LastInferenceMs
                 End If
+            End If
+
+            ' 观测缓冲在 Observer.Build 之后没人再动过，正好把"看到的"和"发出的"
+            ' 配成同一行写进日志。m_lastAction 此刻已经是**本步**输出的动作，
+            ' 而观测里的 34..47 维是**上一步**的动作——两者错开一步是有意的。
+            If observed AndAlso Observer IsNot Nothing Then
+                Call Observer.Record(m_lastAction)
             End If
 
             Call World.SetTargets(m_targets)
@@ -778,8 +843,10 @@ Namespace Core
             Call [Stop]()
 
             Call Policies.Dispose()
+            Call Observer?.Dispose()
             Call World?.Dispose()
 
+            Observer = Nothing
             World = Nothing
         End Sub
     End Class

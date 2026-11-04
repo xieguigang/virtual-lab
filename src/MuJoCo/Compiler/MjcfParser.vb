@@ -862,6 +862,7 @@ Public Module MjcfParser
 
             actuator.Kp = MjcfText.Number(MjcfText.Resolve(child, cls, tableName, "kp"), 0.0)
             actuator.Kv = MjcfText.Number(MjcfText.Resolve(child, cls, tableName, "kv"), 0.0)
+            actuator.Dampratio = MjcfText.Number(MjcfText.Resolve(child, cls, tableName, "dampratio"), 0.0)
 
             Dim gain As Double() = MjcfText.Values(MjcfText.Resolve(child, cls, tableName, "gear"))
 

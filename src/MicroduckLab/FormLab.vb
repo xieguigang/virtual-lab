@@ -340,6 +340,17 @@ Public Class FormLab
                 Call SelectScheme(2)
             Case Keys.D4
                 Call SelectScheme(3)
+            Case Keys.F9
+                ' 观测/动作日志：开着的时候每个控制周期往 CSV 追加一行
+                m_session.DumpObservation = Not m_session.DumpObservation
+
+                If Not m_session.DumpObservation Then
+                    Call m_ui.ShowToast("OBS DUMP OFF")
+                ElseIf m_session.Observer Is Nothing OrElse m_session.Observer.DumpError IsNot Nothing Then
+                    Call m_ui.ShowToast($"DUMP FAILED  {If(m_session.Observer?.DumpError, "no observer")}")
+                Else
+                    Call m_ui.ShowToast($"OBS DUMP ON  {m_session.Observer.ResolvedDumpPath}")
+                End If
         End Select
     End Sub
 

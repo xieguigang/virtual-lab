@@ -673,10 +673,12 @@ Public Class MjEngineBridge
 
                 Case mjtJoint.mjJNT_BALL
                     Dim parentId As Integer = Model.body_parentid(body)
+                    ' 必须用刚体的真值姿态。m_data.xquat 此刻还是**上一帧**的缓存，
+                    ' 用它会和下一步 SyncToEngine 的正变换互相拉扯，见 FREE 分支的说明。
                     Dim parentQuat As Quaternion = If(parentId >= 1,
-                                                      MjMath.Quat(m_data.xquat, parentId * 4),
+                                                      MjMath.QuatOf(m_bodies(parentId).Orientation),
                                                       Quaternion.Identity)
-                    Dim childQuat As Quaternion = MjMath.Quat(m_data.xquat, body * 4)
+                    Dim childQuat As Quaternion = MjMath.QuatOf(rb.Orientation)
                     Dim reference As Quaternion = MjMath.Mul(parentQuat, MjMath.Quat(Model.body_quat, body * 4))
                     Dim relative As Quaternion = MjMath.Normalize(MjMath.Mul(MjMath.Conj(reference), childQuat))
 
@@ -701,7 +703,12 @@ Public Class MjEngineBridge
                     Dim ipos As Vector3 = New Vector3(CSng(Model.body_ipos(body * 3)),
                                                       CSng(Model.body_ipos(body * 3 + 1)),
                                                       CSng(Model.body_ipos(body * 3 + 2)))
-                    Dim rotation As Quaternion = MjMath.Quat(m_data.xquat, body * 4)
+                    ' 用刚体的真值姿态，不能用 m_data.xquat：
+                    ' xquat 要到本方法末尾才刷新，此刻还是上一帧的值。拿旧姿态反算
+                    ' origin = com − R_旧·ipos，下一步 SyncToEngine 又用 R_新 正算回
+                    ' Position，每步就把刚体挪动 (R_新 − R_旧)·ipos。duck 的 trunk 质心
+                    ' 偏移 2.26 cm，躯干微转就会累积成持续漂移 —— 表现为"斜着飘走"。
+                    Dim rotation As Quaternion = MjMath.QuatOf(rb.Orientation)
                     Dim com As Vector3 = New Vector3(CSng(rb.Position.x), CSng(rb.Position.y), CSng(rb.Position.z))
                     Dim origin As Vector3 = com - MjMath.Rotate(rotation, ipos)
 

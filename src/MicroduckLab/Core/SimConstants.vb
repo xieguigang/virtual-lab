@@ -37,13 +37,13 @@ Namespace Core
         ''' the largest joint speed that the observation carries, rad/s
         ''' </summary>
         ''' <remarks>
-        ''' The velocity servo drives the hinge straight to error * gain, so the
-        ''' numbers in the observation are far above the speeds a force balanced
-        ''' actuator produces. Clipping them here keeps the policy in the range it was
-        ''' trained around, which is the only lever left that does not change the
-        ''' controller.
+        ''' 原来这里是 1e9（等于不裁剪），因为旧的 <c>JointDriveHook</c> 是速度伺服，
+        ''' 关节速度被驱动到 <c>error × gain</c>，量级远超训练分布。
+        ''' 换成标准位置伺服之后速度是真实的，但在接触冲击的瞬间仍会冒出几十 rad/s
+        ''' 的尖峰；一个尖峰就足以让策略输出一个相反的大动作，于是越摆越歪。
+        ''' 20 rad/s 是这批策略训练时见过的上限，直接把尖峰切掉。
         ''' </remarks>
-        Public Const ObservedJointSpeed As Double = 1.0E+09
+        Public Const ObservedJointSpeed As Double = 20.0
 
         ''' <summary>the physics sub step of the model, seconds</summary>
         Public Const Timestep As Double = 0.005

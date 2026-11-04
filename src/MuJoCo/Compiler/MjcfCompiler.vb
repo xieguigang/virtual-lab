@@ -947,6 +947,15 @@ Public Module MjcfCompiler
             model.actuator_trnid(a * 2 + 1) = -1
             actuator.TrnId = target
 
+            ' dampratio 优先于显式 kv：kv = 2·ζ·√(kp·M)，M 缺省 1。
+            ' duck 的 chosen_actuator 只给了 dampratio="1"，漏掉这一步
+            ' 位置伺服就是零阻尼弹簧——站立 0.4 s 内角速度冲到 2 rad/s 然后翻倒。
+            Dim damping As Double = actuator.Kv
+
+            If actuator.Dampratio > 0 Then
+                damping = 2.0 * actuator.Dampratio * Math.Sqrt(Math.Abs(actuator.Kp))
+            End If
+
             ' gainprm / biasprm：三种语义都落到同一个仿射力律
             '   force = gain·ctrl + bias[0] + bias[1]·length + bias[2]·velocity
             Select Case actuator.Kind
@@ -956,7 +965,7 @@ Public Module MjcfCompiler
                     model.actuator_gainprm(a * mjNGAIN + 0) = actuator.Kp
                     model.actuator_biasprm(a * mjNBIAS + 0) = 0.0
                     model.actuator_biasprm(a * mjNBIAS + 1) = -actuator.Kp
-                    model.actuator_biasprm(a * mjNBIAS + 2) = -actuator.Kv
+                    model.actuator_biasprm(a * mjNBIAS + 2) = -damping
 
                 Case mjtActuator.mjACTUATOR_VELOCITY, mjtActuator.mjACTUATOR_DAMPER
                     model.actuator_gaintype(a) = CInt(mjtGain.mjGAIN_FIXED)
