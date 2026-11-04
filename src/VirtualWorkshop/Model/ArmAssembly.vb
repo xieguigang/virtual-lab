@@ -1,6 +1,6 @@
 Imports System.IO
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Math3D
 
 Namespace Model
 

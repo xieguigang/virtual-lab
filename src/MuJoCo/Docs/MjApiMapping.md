@@ -135,3 +135,27 @@ spec.AddGeom(spec.World, mjtGeom.mjGEOM_PLANE, New Vector3(2, 2, 0))
 Dim m = mj_compile(spec)
 Dim d = mj_makeData(m)
 ```
+
+## 4. 场景门面与对象式兼容层
+
+宿主（例如 VirtualWorkshop）不再直接引用 `PhysicsEngine.vbproj`，物理能力统一由本程序集提供。
+
+| 命名空间 | 用途 | 主要 API |
+|---|---|---|
+| `MuJoCo.Scene` | MJCF 风格场景门面：`MjSceneSpec` → `MjSpec` → `mjModel` / `mjData` → `mj_step` | `MjSceneSpec`、`MjSceneBuilder.Build`、`MjScene.Step/Advance/Reset/SpawnBody/RemoveBody`、`MjBody`、`MjServo`、`MjSceneContact` |
+| `MuJoCo.Interop` | 与内核同形的对象式世界/刚体句柄 | `Vector3`、`PhysicsMaterial`、`RigidBody3D`、`PhysicsWorld3D` |
+| `MuJoCo.Interop.Math3D` | 姿态与张量 | `Quaternion`、`Matrix3x3`、`Vector3Math` |
+| `MuJoCo.Interop.Collision3D` | 碰撞形状、凸网格、接触 | `Collider3D`、`ConvexMesh3D`、`ConvexPrimitives3D`、`Manifold3D`、`ContactPoint3D` |
+| `MuJoCo.Interop.Joints3D` | 关节、伺服与弹簧 | `RevoluteJoint3D`、`PrismaticJoint3D`、`JointServo3D`、`SpringJoint3D` |
+| `MuJoCo.Geometry` | 纯托管凸体图元 | `MjPrimitives.Box/Sphere/Cylinder/Cone/Wedge/...` |
+| `MuJoCo.Import` | URDF → 中性场景描述 | `MjUrdf.Read/ReadXml` |
+
+语义说明：
+
+- `Interop` 层的**公开签名**只使用 MuJoCo 自有类型；内核类型仅出现在 `Friend` 转换模块
+  `MjInterop` 中，外部程序集不可见。
+- `Scene` 层是纯 MuJoCo 风格路径：结构变更走 `MjSpec` 重建并按名恢复 `qpos/qvel`，
+  热路径只调用 `MjApi.mj_step`。
+- VirtualWorkshop 为保证既有物理行为与状态快照逐位一致，主仿真链使用 `Interop` 世界句柄；
+  `Scene` 门面供新建场景与后续渐进迁移使用。两者共用同一个物理内核。
+

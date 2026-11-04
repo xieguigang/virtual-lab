@@ -2,8 +2,8 @@ Imports System.Diagnostics
 Imports System.Drawing
 Imports Microsoft.VisualBasic.Drawing.DirectX
 Imports Microsoft.VisualBasic.Drawing.DirectX.Scene3D
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Math3D
 Imports Microsoft.VisualBasic.Imaging.Drawing3D
 Imports VirtualWorkshop.Simulation
 

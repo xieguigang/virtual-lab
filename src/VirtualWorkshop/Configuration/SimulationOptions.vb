@@ -1,5 +1,5 @@
 Imports System.IO
-Imports Microsoft.VisualBasic.Engine.Physics
+Imports MuJoCo.Interop
 
 Namespace Configuration
 

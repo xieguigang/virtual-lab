@@ -1,6 +1,6 @@
-﻿Imports System.Text.Json.Nodes
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports System.Text.Json.Nodes
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Math3D
 Imports VirtualWorkshop.Model
 Imports VirtualWorkshop.Sensing
 Imports VirtualWorkshop.Simulation

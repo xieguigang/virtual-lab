@@ -4,6 +4,10 @@ Imports System.Numerics
 Imports Microsoft.VisualBasic.ApplicationServices.Debugging
 Imports MuJoCo
 Imports MuJoCo.Geometry
+Imports MuJoCo.Scene
+Imports iv = MuJoCo.Interop
+Imports im = MuJoCo.Interop.Math3D
+Imports urdf = MuJoCo.Import.MjUrdf
 
 ''' <summary>
 ''' 纯托管 MuJoCo 仿真库的控制台自测。
@@ -25,6 +29,16 @@ Module Program
     Function Main(args As String()) As Integer
         DebugAudit.MaxEvents = 8192
 
+        Dim sceneOnly As Boolean = False
+
+        If args IsNot Nothing Then
+            For Each arg As String In args
+                If String.Equals(arg, "--scene-only", StringComparison.OrdinalIgnoreCase) Then
+                    sceneOnly = True
+                End If
+            Next
+        End If
+
         m_root = FindWorkspace()
 
         Call DebugAudit.Mark("environment", $"workspace = {m_root}")
@@ -37,25 +51,34 @@ Module Program
 
         m_robot = Path.Combine(m_root, "src", "MicroduckLab", "Assets", "robot", "mjlab")
 
-        Call Run("model", AddressOf CaseModel)
-        Call Run("kinematics", AddressOf CaseKinematics)
-        Call Run("free fall", AddressOf CaseFreeFall)
-        Call Run("pendulum", AddressOf CasePendulum)
-        Call Run("mass matrix", AddressOf CaseMassMatrix)
-        Call Run("jacobian", AddressOf CaseJacobian)
-        Call Run("state", AddressOf CaseStateRoundTrip)
-        Call Run("ray", AddressOf CaseRay)
-        Call Run("duck standing", AddressOf CaseDuckStanding)
-        Call Run("arena scene", AddressOf CaseArenaScene)
-        Call Run("joint readback", AddressOf CaseJointReadback)
-        Call Run("stand still", AddressOf CaseStandStill)
-        Call Run("long stand", AddressOf CaseLongStand)
-        Call Run("body velocity", AddressOf CaseBodyVelocity)
-        Call Run("actuator sign", AddressOf CaseActuatorSign)
-        Call Run("gain sweep", AddressOf CaseGainSweep)
-        Call Run("static balance", AddressOf CaseStaticBalance)
-        Call Run("friction", AddressOf CaseFriction)
-        Call Run("convex friction", AddressOf CaseConvexFriction)
+        If Not sceneOnly Then
+            Call Run("model", AddressOf CaseModel)
+            Call Run("kinematics", AddressOf CaseKinematics)
+            Call Run("free fall", AddressOf CaseFreeFall)
+            Call Run("pendulum", AddressOf CasePendulum)
+            Call Run("mass matrix", AddressOf CaseMassMatrix)
+            Call Run("jacobian", AddressOf CaseJacobian)
+            Call Run("state", AddressOf CaseStateRoundTrip)
+            Call Run("ray", AddressOf CaseRay)
+            Call Run("duck standing", AddressOf CaseDuckStanding)
+            Call Run("arena scene", AddressOf CaseArenaScene)
+            Call Run("joint readback", AddressOf CaseJointReadback)
+            Call Run("stand still", AddressOf CaseStandStill)
+            Call Run("long stand", AddressOf CaseLongStand)
+            Call Run("body velocity", AddressOf CaseBodyVelocity)
+            Call Run("actuator sign", AddressOf CaseActuatorSign)
+            Call Run("gain sweep", AddressOf CaseGainSweep)
+            Call Run("static balance", AddressOf CaseStaticBalance)
+            Call Run("friction", AddressOf CaseFriction)
+            Call Run("convex friction", AddressOf CaseConvexFriction)
+        End If
+
+        Call Run("scene primitives", AddressOf CaseScenePrimitives)
+        Call Run("scene step", AddressOf CaseSceneStep)
+        Call Run("scene rebuild", AddressOf CaseSceneRebuild)
+        Call Run("interop math", AddressOf CaseInteropMath)
+        Call Run("interop world", AddressOf CaseInteropWorld)
+        Call Run("urdf import", AddressOf CaseUrdfImport)
 
         Dim report As String = Path.Combine(AppContext.BaseDirectory, "mujoco-test-report.html")
         Call DebugAudit.SaveReport(report)
@@ -1697,6 +1720,247 @@ Module Program
 
         Call DebugAudit.Check(Math.Abs(d.qvel(0)) < 0.05,
                               $"friction stops the convex hull (vx = {d.qvel(0):F4} after 0.5 s)")
+    End Sub
+
+    ' /********************************************************************************/
+    '  15. 新增 API：程序化凸体图元
+    ' /********************************************************************************/
+
+    Private Sub CaseScenePrimitives()
+        Call DebugAudit.Mark("scene primitives", "procedural convex primitives expose vertices and faces")
+
+        Dim box As MjPrimitive = MjPrimitives.Box(0.1, 0.2, 0.3)
+
+        Call DebugAudit.Check(box.VertexCount = 8 AndAlso box.FaceCount = 12,
+                              $"box has 8 vertices / 12 faces (got {box.VertexCount}/{box.FaceCount})")
+
+        Dim maxX As Single = 0.0F
+
+        For Each vertex As Vector3 In box.Vertices
+            maxX = Math.Max(maxX, Math.Abs(vertex.X))
+        Next
+
+        Call DebugAudit.Check(Math.Abs(maxX - 0.05F) < 1.0E-6,
+                              $"box half width is 0.05 (got {maxX:F6})")
+
+        Dim sphere As MjPrimitive = MjPrimitives.Sphere(0.05, 12, 8)
+
+        Call DebugAudit.Check(sphere.VertexCount = 12 * 9 AndAlso sphere.FaceCount = 12 * 8 * 2,
+                              $"sphere grid is 12x8 (got {sphere.VertexCount}/{sphere.FaceCount})")
+
+        For Each primitive As MjPrimitive In New MjPrimitive() {
+            MjPrimitives.Cylinder(0.05, 0.1, 12),
+            MjPrimitives.Cone(0.05, 0.1, 12),
+            MjPrimitives.Wedge(0.1, 0.1, 0.1),
+            MjPrimitives.Disc(0.05, 0.02, 12),
+            MjPrimitives.Frustum(0.05, 0.02, 0.1, 12),
+            MjPrimitives.Hemisphere(0.05, 12, 4),
+            MjPrimitives.Prism(6, 0.05, 0.1),
+            MjPrimitives.Pyramid(4, 0.05, 0.1)
+        }
+            Call DebugAudit.Check(primitive.VertexCount >= 6 AndAlso primitive.FaceCount >= 8,
+                                  $"primitive is non-degenerate ({primitive.VertexCount}/{primitive.FaceCount})")
+        Next
+    End Sub
+
+    ' /********************************************************************************/
+    '  16. 新增 API：MJCF 场景门面（MjSpec → mj_compile → mj_step）
+    ' /********************************************************************************/
+
+    Private Sub CaseSceneStep()
+        Call DebugAudit.Mark("scene step", "MjScene compiles a spec and advances through mj_step")
+
+        Dim spec As New MjSceneSpec()
+
+        spec.Options.Timestep = 0.005
+        spec.Options.Iterations = 20
+
+        Dim link As MjBodySpec = spec.AddBody("link", Nothing, New Vector3(0.0F, 0.0F, 0.5F))
+
+        link.Mass = 0.5
+        link.Inertia = New Double() {0.001, 0.001, 0.001, 0.0, 0.0, 0.0}
+        link.Extents = New Vector3(0.02F, 0.02F, 0.05F)
+
+        Dim hinge As MjJointSpec = spec.AddJoint("hinge", "link", mjtJoint.mjJNT_HINGE)
+
+        hinge.Axis = New Vector3(0.0F, 1.0F, 0.0F)
+        hinge.Lower = -1.0
+        hinge.Upper = 1.0
+        hinge.Damping = 0.1
+
+        Dim servoSpec As MjActuatorSpec = spec.AddActuator("servo", "hinge", 10.0)
+
+        servoSpec.Kv = 1.0
+
+        Dim sim As New MjScene(spec)
+
+        Call DebugAudit.Check(sim.Model IsNot Nothing AndAlso sim.Model.nbody >= 2,
+                              $"scene compiled with {sim.Model.nbody} bodies")
+
+        Dim body As MjBody = sim.Body("link")
+        Dim servo As MjServo = sim.Servo("servo")
+
+        Call DebugAudit.Check(body IsNot Nothing, "the body handle resolves by name")
+        Call DebugAudit.Check(servo IsNot Nothing, "the servo handle resolves by name")
+
+        servo.Target = 0.2
+
+        For i As Integer = 1 To 20
+            Call sim.Step()
+        Next
+
+        Call DebugAudit.Check(Math.Abs(sim.Data.time - 0.1) < 1.0E-9,
+                              $"20 steps advance time to 0.1 s (got {sim.Data.time:F6})")
+        Call DebugAudit.Check(Math.Abs(servo.Target - 0.2) < 1.0E-12,
+                              "the control signal survives stepping")
+        Call DebugAudit.Check(Not Single.IsNaN(body.Position.Z),
+                              "the body position is finite")
+        Call DebugAudit.Check(sim.Bodies.Count >= 2, "the body view is queryable")
+
+        Dim before As Double = sim.Data.time
+
+        Call sim.Advance(0.05)
+
+        Call DebugAudit.Check(sim.Data.time > before, "Advance() keeps stepping forward")
+
+        Call sim.Reset()
+
+        Call DebugAudit.Check(Math.Abs(sim.Data.time) < 1.0E-12, "Reset() clears simulation time")
+    End Sub
+
+    ' /********************************************************************************/
+    '  17. 新增 API：结构变更后的受控重建
+    ' /********************************************************************************/
+
+    Private Sub CaseSceneRebuild()
+        Call DebugAudit.Mark("scene rebuild", "structural changes rebuild the model and keep name handles valid")
+
+        Dim spec As New MjSceneSpec()
+        Dim sim As New MjScene(spec)
+        Dim initial As Integer = sim.Model.nbody
+
+        Call DebugAudit.Check(initial >= 1, $"the empty scene has a world body (nbody={initial})")
+
+        Dim extra As New MjBodySpec With {
+            .Name = "extra",
+            .Mass = 0.2,
+            .Extents = New Vector3(0.03F, 0.03F, 0.03F)
+        }
+
+        Call sim.SpawnBody(extra)
+
+        Call DebugAudit.Check(sim.Model.nbody = initial + 1,
+                              $"SpawnBody adds one body (nbody={sim.Model.nbody})")
+        Call DebugAudit.Check(sim.Body("extra") IsNot Nothing,
+                              "the spawned body resolves by name after rebuild")
+
+        Call sim.RemoveBody("extra")
+
+        Call DebugAudit.Check(sim.Model.nbody = initial,
+                              $"RemoveBody restores the body count (nbody={sim.Model.nbody})")
+        Call DebugAudit.Check(sim.Body("extra") Is Nothing,
+                              "the removed body no longer resolves")
+    End Sub
+
+    ' /********************************************************************************/
+    '  18. 新增 API：MuJoCo 自有的数学类型
+    ' /********************************************************************************/
+
+    Private Sub CaseInteropMath()
+        Call DebugAudit.Mark("interop math", "MuJoCo-owned vector/quaternion/matrix API")
+
+        Dim a As New iv.Vector3(1.0, 2.0, 3.0)
+        Dim b As New iv.Vector3(4.0, 5.0, 6.0)
+        Dim sum As iv.Vector3 = a + b
+
+        Call DebugAudit.Check(sum.x = 5.0 AndAlso sum.y = 7.0 AndAlso sum.z = 9.0,
+                              "vector addition matches component-wise semantics")
+        Call DebugAudit.Check(iv.Vector3.Dot(a, b) = 32.0, "vector dot product")
+
+        Dim q As im.Quaternion = im.Quaternion.FromAxisAngle(New iv.Vector3(0.0, 0.0, 1.0), Math.PI * 0.5)
+        Dim rotated As iv.Vector3 = q.Rotate(New iv.Vector3(1.0, 0.0, 0.0))
+
+        Call DebugAudit.Check(Math.Abs(rotated.y - 1.0) < 1.0E-6 AndAlso Math.Abs(rotated.x) < 1.0E-6,
+                              $"a 90 deg Z rotation maps +X to +Y (got {rotated.x:F4},{rotated.y:F4})")
+
+        Dim m As im.Matrix3x3 = im.Matrix3x3.Diagonal(2.0, 3.0, 4.0)
+        Dim mv As iv.Vector3 = m.MultiplyLeft(New iv.Vector3(1.0, 1.0, 1.0))
+
+        Call DebugAudit.Check(mv.x = 2.0 AndAlso mv.y = 3.0 AndAlso mv.z = 4.0,
+                              "MultiplyLeft applies the diagonal matrix")
+        Call DebugAudit.Check(Math.Abs(im.Vector3Math.Length(New iv.Vector3(3.0, 4.0, 0.0)) - 5.0) < 1.0E-9,
+                              "Vector3Math.Length")
+    End Sub
+
+    ' /********************************************************************************/
+    '  19. 新增 API：世界句柄装配与步进
+    ' /********************************************************************************/
+
+    Private Sub CaseInteropWorld()
+        Call DebugAudit.Mark("interop world", "MuJoCo-owned world handle drives the physics kernel")
+
+        Dim world As New iv.PhysicsWorld3D() With {
+            .FixedDt = 0.005,
+            .Iterations = 20,
+            .Substeps = 4,
+            .Gravity = New iv.Vector3(0.0, 0.0, -9.81)
+        }
+
+        Dim ground As iv.RigidBody3D = iv.PhysicsWorld3D.StaticPlane(
+            New iv.Vector3(0.0, 0.0, 1.0), 0.0, New iv.PhysicsMaterial(0.8, 0.0))
+        Dim ball As iv.RigidBody3D = iv.PhysicsWorld3D.Box(
+            0.1, 0.1, 0.1, 1.0, New iv.PhysicsMaterial(0.8, 0.0))
+
+        ball.Position = New iv.Vector3(0.0, 0.0, 1.0)
+
+        Call world.Add(ground)
+        Call world.Add(ball)
+
+        Call DebugAudit.Check(world.Bodies.Count = 2, $"the world holds 2 bodies (got {world.Bodies.Count})")
+
+        For i As Integer = 1 To 200
+            Call world.Step(world.FixedDt)
+        Next
+
+        Call DebugAudit.Check(ball.Position.z < 0.9 AndAlso ball.Position.z > -0.2,
+                              $"the box falls onto the ground (z = {ball.Position.z:F4})")
+
+        Call world.ClearVelocities()
+
+        Call DebugAudit.Check(ball.Velocity.Magnitude < 1.0E-6,
+                              "ClearVelocities zeroes the body velocity")
+        Call DebugAudit.Check(world.Contacts IsNot Nothing,
+                              "the contact view is queryable without engine types")
+    End Sub
+
+    ' /********************************************************************************/
+    '  20. 新增 API：URDF → MjSceneSpec 装配映射
+    ' /********************************************************************************/
+
+    Private Sub CaseUrdfImport()
+        Call DebugAudit.Mark("urdf import", "URDF skeleton maps to a neutral MjSceneSpec")
+
+        Dim modelPath As String = Path.Combine(m_root, "models", "six_axis_arm.urdf")
+
+        Call DebugAudit.Check(File.Exists(modelPath), $"the URDF model exists: {modelPath}")
+
+        Dim spec As MjSceneSpec = urdf.Read(modelPath)
+
+        Call DebugAudit.Check(spec.Bodies.Count = 8, $"8 links (got {spec.Bodies.Count})")
+        Call DebugAudit.Check(spec.Joints.Count = 6, $"6 actuated joints (got {spec.Joints.Count})")
+
+        Dim hasHinge As Boolean = False
+
+        For Each joint As MjJointSpec In spec.Joints
+            If joint.Type = mjtJoint.mjJNT_HINGE Then hasHinge = True
+        Next
+
+        Call DebugAudit.Check(hasHinge, "revolute joints map to hinge joints")
+
+        Dim tree As MjSpec = MjSceneBuilder.Build(spec)
+
+        Call DebugAudit.Check(tree IsNot Nothing AndAlso tree.World IsNot Nothing,
+                              "the URDF skeleton assembles into an MjSpec tree")
     End Sub
 
 End Module

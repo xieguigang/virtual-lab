@@ -1,6 +1,6 @@
-﻿Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Collision3D
+Imports MuJoCo.Interop.Math3D
 Imports VirtualWorkshop.Model
 
 Namespace Simulation

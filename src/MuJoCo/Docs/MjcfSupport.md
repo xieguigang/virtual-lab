@@ -107,3 +107,16 @@
 - mesh 文件缺失 → 同上，错误文本带完整路径。
 - 关节的 `qpos` 地址重叠 → `MjAssert.CheckModel` 抛 `MjException`。
 - 运行期的越界索引 → 抛 `ArgumentOutOfRangeException`，绝不静默返回 0。
+
+## 10. 场景装配扩展（非 MJCF 元素）
+
+- `MjSceneBuilder` 支持从中性 DTO 生成 body 树、joint、geom 与 position/velocity 执行器；
+  结构变更（`SpawnBody` / `RemoveBody` / `ClearObjects`）通过重建模型实现，
+  不会在 `mj_step` 热路径里编译。
+- `MjUrdf` 把 URDF 的 `link` / `joint` / `origin` / `axis` / `limit` / `inertial` /
+  `box` 碰撞尺寸映射成 `MjSceneSpec`；GLB/STL 网格仍由宿主资产层注入。
+- `MjPrimitives` 提供 box / sphere / cylinder / cone / wedge / disc / frustum /
+  hemisphere / prism / pyramid 的纯 `System.Numerics` 顶点与三角面；
+  网格参与碰撞时仍按 §4 的规则取凸包（点数上限 600）。
+- `MjBodySpec.Kinematic` 目前按「无自由度的静态碰撞体」处理：参与碰撞、不受重力积分；
+  需要按 `qpos` 精确驱动的运动学体时，仍应在模型层补充 mocap 语义。

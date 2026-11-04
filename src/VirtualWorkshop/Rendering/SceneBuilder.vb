@@ -1,7 +1,7 @@
 Imports System.Diagnostics
 Imports System.Drawing
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Math3D
 Imports Microsoft.VisualBasic.Imaging.Drawing3D
 Imports VirtualWorkshop.Model
 Imports VirtualWorkshop.Simulation

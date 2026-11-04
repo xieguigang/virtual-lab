@@ -1,9 +1,9 @@
 Imports System.Drawing
 Imports Microsoft.VisualBasic.Drawing.DirectX
 Imports Microsoft.VisualBasic.Drawing.DirectX.Scene3D
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Collision3D
+Imports MuJoCo.Interop.Math3D
 Imports VirtualWorkshop.Simulation
 
 Namespace Rendering
@@ -127,17 +127,17 @@ Namespace Rendering
 
             If platform Is Nothing OrElse platform.Springs.Count = 0 Then Return
 
-            For Each spring As Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D In platform.Springs
+            For Each spring As MuJoCo.Interop.Joints3D.SpringJoint3D In platform.Springs
                 Call AddSpringCoil(spring, anchor)
             Next
         End Sub
 
         ''' <remarks>
-        ''' 两端直接用约束给出的 <see cref="Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D.WorldAnchorA"/>
-        ''' 与 <see cref="Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D.WorldAnchorB"/>，
+        ''' 两端直接用约束给出的 <see cref="MuJoCo.Interop.Joints3D.SpringJoint3D.WorldAnchorA"/>
+        ''' 与 <see cref="MuJoCo.Interop.Joints3D.SpringJoint3D.WorldAnchorB"/>，
         ''' 所以弹簧看起来是真的"接在"地面锚点与木板上，而不是漂在旁边。
         ''' </remarks>
-        Private Sub AddSpringCoil(coil As Microsoft.VisualBasic.Engine.Physics.Joints3D.SpringJoint3D,
+        Private Sub AddSpringCoil(coil As MuJoCo.Interop.Joints3D.SpringJoint3D,
                                   anchor As Vector3)
 
             If coil Is Nothing Then Return

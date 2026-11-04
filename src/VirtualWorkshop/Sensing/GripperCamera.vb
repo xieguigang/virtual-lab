@@ -1,6 +1,6 @@
 Imports System.Diagnostics
 Imports System.Threading
-Imports Microsoft.VisualBasic.Engine.Physics
+Imports MuJoCo.Interop
 Imports VirtualWorkshop.Simulation
 
 Namespace Sensing

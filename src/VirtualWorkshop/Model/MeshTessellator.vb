@@ -1,5 +1,5 @@
-Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Collision3D
 Imports Microsoft.VisualBasic.Imaging.Drawing3D
 
 Namespace Model

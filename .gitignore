@@ -427,3 +427,7 @@ FodyWeavers.xsd
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
 /_tmp
+tests/baselines/virtualworkshop-baseline.before.json
+tests/baselines/virtualworkshop-baseline.json
+tests/baselines/virtualworkshop-baseline.after.json
+tests/baselines/virtualworkshop-selftest-baseline.txt

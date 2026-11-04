@@ -1,8 +1,7 @@
-﻿Imports Microsoft.VisualBasic.Engine.Physics
-Imports Microsoft.VisualBasic.Engine.Physics.Collision3D
-Imports Microsoft.VisualBasic.Engine.Physics.ForceFields3D
-Imports Microsoft.VisualBasic.Engine.Physics.Joints3D
-Imports Microsoft.VisualBasic.Engine.Physics.Math3D
+Imports MuJoCo.Interop
+Imports MuJoCo.Interop.Collision3D
+Imports MuJoCo.Interop.Joints3D
+Imports MuJoCo.Interop.Math3D
 Imports VirtualWorkshop.Model
 
 Namespace Simulation
@@ -230,7 +229,7 @@ Namespace Simulation
             If world Is Nothing Then Return
 
             For Each spring As SpringJoint3D In Springs
-                If world.Constraints.Contains(spring) Then world.Constraints.Remove(spring)
+                Call world.RemoveConstraint(spring)
             Next
 
             If Stopper IsNot Nothing Then world.Remove(Stopper)
