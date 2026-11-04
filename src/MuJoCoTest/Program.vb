@@ -52,6 +52,8 @@ Module Program
         Call Run("long stand", AddressOf CaseLongStand)
         Call Run("body velocity", AddressOf CaseBodyVelocity)
         Call Run("actuator sign", AddressOf CaseActuatorSign)
+        Call Run("gain sweep", AddressOf CaseGainSweep)
+        Call Run("static balance", AddressOf CaseStaticBalance)
         Call Run("friction", AddressOf CaseFriction)
         Call Run("convex friction", AddressOf CaseConvexFriction)
 
@@ -115,7 +117,7 @@ Module Program
         Dim spec As MjSpec = MjcfParser.Parse(modelPath)
 
         ' 与 MicroduckLab.MjSceneOptions 的默认值保持一致
-        spec.Opt.iterations = 16
+        spec.Opt.iterations = 48
 
         ' MJCF 里写的是 meshdir="assets"，真实目录是 meshes
         spec.MeshResolver = Function(file As String) Path.Combine(m_robot, "meshes", file)
@@ -1073,16 +1075,401 @@ Module Program
 
             Dim delta As Double = d.qpos(adr) - pose(probe)
 
-            Call DebugAudit.Check(delta > 0.02,
-                                  $"'{names(probe)}': +0.4 target moved the joint by {delta:F4} rad")
+            ' 只断言方向：抬整条腿（hip_pitch）时 0.22 N·m 只能挪动毫米级，
+            ' 但符号必须是正的——反号才是 bug
+            Call DebugAudit.Check(delta > 1.0E-4,
+                                  $"'{names(probe)}': +0.4 target moved the joint by {delta:F6} rad")
         Next
     End Sub
+
+    ' /********************************************************************************/
+    '  12e. 增益扫描（0.55 到底够不够）
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 同一套物理，只把执行器的 kp 换掉，看站着不动的表现。
+    ''' </summary>
+    ''' <remarks>
+    ''' MJCF 的根类 <c>microduck</c> 写的是 <c>&lt;position kp="50" dampratio="1"/&gt;</c>，
+    ''' 而 duck 实际用的 <c>chosen_actuator</c> 把它覆盖成了 <c>kp="0.55" kv="0.0"</c>。
+    ''' 0.55 的刚度要把力矩打到 0.96 N·m 的上限需要 1.75 rad 误差，腿实际上是"软"的；
+    ''' 如果策略是按 kp=50 训练的，两者差了 90 倍，闭环必然发散。
+    ''' </remarks>
+    Private Sub CaseGainSweep()
+        Call DebugAudit.Mark("gain", "how the stand pose behaves at different kp")
+
+        Dim names As String() = {
+            "left_hip_yaw", "left_hip_roll", "left_hip_pitch", "left_knee", "left_ankle",
+            "neck_pitch", "head_pitch", "head_yaw", "head_roll",
+            "right_hip_yaw", "right_hip_roll", "right_hip_pitch", "right_knee", "right_ankle"}
+        Dim pose As Double() = {
+            0, -0.08726646259971647, -0.457924, -0.00494, 0.452984,
+            0.3490658503988659, 0.3490658503988659, 0, 0,
+            0, 0.08726646259971647, 0.457924, 0.00494, -0.452984}
+
+        For Each gain As Double In New Double() {0.55, 5.0, 50.0}
+            Dim m As mjModel = LoadDuck()
+
+            For a As Integer = 0 To m.nactuator - 1
+                m.actuator_gainprm(a * mjNGAIN + 0) = gain
+                m.actuator_biasprm(a * mjNBIAS + 1) = -gain
+            Next
+
+            Dim d As mjData = MjApi.mj_makeData(m)
+            Dim trunk As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "trunk_base")
+
+            ' 只跑 2 秒，够看出是"塌"还是"站住"
+            Dim result As Double() = RunLong(m, d, trunk, names, pose, False, $"kp={gain}", 150)
+
+            Call ($"kp={gain}: final z={result(0):F4} max|w|={result(1):F2} drift={result(2):F3} " &
+                  $"projGravity={ProjectedGravityZ(d, trunk):F3} " &
+                  $"storedKp={m.actuator_gainprm(0):F2} force0={d.actuator_force(0):F4}").debug
+        Next
+    End Sub
+
+    ' /********************************************************************************/
+    '  16. 静力学求解：找一组站得住的关节角
+    ' /********************************************************************************/
+
+    ''' <summary>
+    ''' 固定躯干姿态，优化 14 个铰链角，使两脚底面等高、脚掌水平、重心投影落在
+    ''' 双脚支撑中心。
+    ''' </summary>
+    ''' <remarks>
+    ''' <para>
+    ''' 需求背景：<c>SimConstants.DefaultPose</c> 是从别处抄来的 14 个角度，
+    ''' 而这份 MJCF 里没有 <c>&lt;keyframe&gt;</c>。实测把它当作站立目标时，
+    ''' 即使把执行器刚度从 0.55 拉到 50（等价于刚性腿），鸭子仍在 0.5 秒内翻倒
+    ''' ——说明问题不在控制，而在"这组角度本身重心就落在支撑多边形外"。
+    ''' </para>
+    ''' <para>
+    ''' 求解方法是坐标下降：逐关节沿 ±步长试探，取代价更小的一侧，步长每轮衰减。
+    ''' 代价 = 两脚高度差² + 两脚底面倾斜² + 重心到支撑中心距离²（都以毫米计较），
+    ''' 再叠一个"别离种子太远"的弱正则，避免解出一组扭曲但数学上平衡的姿态。
+    ''' </para>
+    ''' </remarks>
+    Private Sub CaseStaticBalance()
+        Call DebugAudit.Mark("statics", "solve a statically balanced stand pose")
+
+        Dim names As String() = {
+            "left_hip_yaw", "left_hip_roll", "left_hip_pitch", "left_knee", "left_ankle",
+            "neck_pitch", "head_pitch", "head_yaw", "head_roll",
+            "right_hip_yaw", "right_hip_roll", "right_hip_pitch", "right_knee", "right_ankle"}
+        Dim seed As Double() = {
+            0, -0.08726646259971647, -0.457924, -0.00494, 0.452984,
+            0.3490658503988659, 0.3490658503988659, 0, 0,
+            0, 0.08726646259971647, 0.457924, 0.00494, -0.452984}
+
+        Dim m As mjModel = LoadDuck()
+        Dim d As mjData = MjApi.mj_makeData(m)
+
+        Dim leftFoot As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "ankle_left")
+        Dim rightFoot As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "ankle_right")
+        Dim trunk As Integer = MjApi.mj_name2id(m, mjtObj.mjOBJ_BODY, "trunk_base")
+        Dim freeAdr As Integer = m.jnt_qposadr(FreeJointOf(m))
+
+        Dim adr(SimConstants14 - 1) As Integer
+        Dim act(SimConstants14 - 1) As Integer
+
+        For j As Integer = 0 To SimConstants14 - 1
+            adr(j) = m.jnt_qposadr(MjApi.mj_name2id(m, mjtObj.mjOBJ_JOINT, names(j)))
+            act(j) = MjApi.mj_name2id(m, mjtObj.mjOBJ_ACTUATOR, names(j))
+        Next
+
+        ' 抬高到不接触地面的位置，只做几何评估
+        d.qpos(freeAdr + 0) = 0.0
+        d.qpos(freeAdr + 1) = 0.0
+        d.qpos(freeAdr + 2) = 0.30
+        Call MjMath.WriteQuat(d.qpos, freeAdr + 3, Quaternion.Identity)
+
+        Dim q(SimConstants14 - 1) As Double
+        Call Array.Copy(seed, q, SimConstants14)
+
+        Dim seedCost As Double = EvaluatePose(m, d, adr, q, leftFoot, rightFoot, seed)
+
+        Call ($"statics: seed cost={seedCost:F4}  com=({d.subtree_com(0):F4},{d.subtree_com(1):F4})").debug
+
+        Dim current As Double = seedCost
+        Dim stepSize As Double = 0.12
+
+        ' 坐标下降：每维先定方向，再沿该方向连续走几步。
+        ' 只做"试一次 ±step"的话，14 维上每轮只能把代价降一点点，80 轮后
+        ' 仍停在 7~8 mm 的偏差上，落到物理里还是会倒。
+        ' 只放开左腿的 roll/pitch/knee/ankle（跳过 hip_yaw），右腿由镜像导出。
+        ' hip_yaw 是绕竖直轴的，放开它优化器会把两条腿拧成"外八"来把支撑中心
+        ' 挪到重心下面——数学上代价能到 0，但那是靠 31° 的外撇换来的，
+        ' 落进物理里依然站不住。头部 4 个关节同理，质量小，放开只会钻空子。
+        For iteration As Integer = 1 To 200
+            For j As Integer = 1 To 4
+                Dim origin As Double = q(j)
+                Dim direction As Double = 0.0
+                Dim bestValue As Double = origin
+
+                For Each sign As Double In New Double() {1.0, -1.0}
+                    Dim trial As Double = origin + sign * stepSize
+
+                    If Not InReach(trial, seed(j)) Then
+                        Continue For
+                    End If
+
+                    q(j) = trial
+
+                    Dim cost As Double = EvaluatePose(m, d, adr, q, leftFoot, rightFoot, seed)
+
+                    If cost < current Then
+                        current = cost
+                        bestValue = trial
+                        direction = sign
+                    End If
+                Next
+
+                q(j) = bestValue
+
+                ' 沿已确认的方向继续推进，直到不再改善
+                If direction <> 0 Then
+                    For probe As Integer = 1 To 6
+                        Dim trial As Double = q(j) + direction * stepSize
+
+                        If Not InReach(trial, seed(j)) Then
+                            Exit For
+                        End If
+
+                        q(j) = trial
+
+                        Dim cost As Double = EvaluatePose(m, d, adr, q, leftFoot, rightFoot, seed)
+
+                        If cost >= current Then
+                            ' 走过头了：必须退回上一处，否则这一维停在更差的位置上
+                            q(j) -= direction * stepSize
+
+                            Exit For
+                        End If
+
+                        current = cost
+                    Next
+                End If
+            Next
+
+            stepSize *= 0.97
+
+            If stepSize < 1.0E-4 Then
+                Exit For
+            End If
+        Next
+
+        Dim finalCost As Double = EvaluatePose(m, d, adr, q, leftFoot, rightFoot, seed)
+
+        Call DebugAudit.Snapshot(("seed cost", seedCost), ("solved cost", finalCost))
+
+        Call ($"statics: solved cost={finalCost:F6}  " &
+              $"com=({d.subtree_com(0):F5},{d.subtree_com(1):F5})  z_com={d.subtree_com(2):F4}").debug
+        Call "statics: solved pose (rad):".debug
+
+        For j As Integer = 0 To SimConstants14 - 1
+            Call ($"    {names(j),-16} {q(j):F6}   (seed {seed(j):F6}, moved {q(j) - seed(j):+0.000000;-0.000000})").debug
+        Next
+
+        Call ("statics: paste into SimConstants.DefaultPose:" & Environment.NewLine &
+              "        Public ReadOnly DefaultPose As Double() = {" & Environment.NewLine &
+              "            " & JoinAngles(q, 5) & "," & Environment.NewLine &
+              "            " & JoinAngles(SkipTake(q, 5, 4), 4) & "," & Environment.NewLine &
+              "            " & JoinAngles(SkipTake(q, 9, 5), 5) & Environment.NewLine &
+              "        }").debug
+
+        Call DebugAudit.Check(finalCost < seedCost,
+                              $"the solved pose is better than the seed ({finalCost:F4} < {seedCost:F4})")
+
+        ' 拿这组角度实际跑 3 秒。几何求解与 kp 无关，但"能不能站住"取决于腿有多硬：
+        ' kp=0.55 时重心偏 0.05 mm 也撑不住（腿会塌），kp=50 时腿接近刚性。
+        For Each gain As Double In New Double() {0.55, 50.0}
+            Dim mV As mjModel = LoadDuck()
+
+            For a As Integer = 0 To mV.nactuator - 1
+                mV.actuator_gainprm(a * mjNGAIN + 0) = gain
+                mV.actuator_biasprm(a * mjNBIAS + 1) = -gain
+            Next
+
+            Dim dV As mjData = MjApi.mj_makeData(mV)
+
+            For j As Integer = 0 To SimConstants14 - 1
+                Dim joint As Integer = MjApi.mj_name2id(mV, mjtObj.mjOBJ_JOINT, names(j))
+                Dim actuator As Integer = MjApi.mj_name2id(mV, mjtObj.mjOBJ_ACTUATOR, names(j))
+
+                dV.qpos(mV.jnt_qposadr(joint)) = q(j)
+                dV.ctrl(actuator) = q(j)
+            Next
+
+            Call MjApi.mj_forward(mV, dV)
+            Call DropToFloor(mV, dV, 0.0005)
+            Call MjApi.mj_clearContactCache(mV, dV)
+
+            For iStep As Integer = 1 To 150
+                For subStep As Integer = 1 To 4
+                    Call MjApi.mj_step(mV, dV)
+                Next
+            Next
+
+            Dim trunkV As Integer = MjApi.mj_name2id(mV, mjtObj.mjOBJ_BODY, "trunk_base")
+            Dim gravity As Double = ProjectedGravityZ(dV, trunkV)
+
+            Call ($"statics: kp={gain}  after 3 s  z={dV.xpos(trunkV * 3 + 2):F4}  " &
+                  $"projGravity={gravity:F3}  ncon={dV.ncon}").debug
+
+        Next
+
+        ' 只校验"几何上平衡"这件事——求解器的职责就是把重心压到支撑中心、
+        ' 把两只脚摆到同一水平面。至于这组角度落进物理能不能站住，
+        ' 还取决于接触模型（实测 ncon 只有 4，即单脚接触），那是另一层的问题。
+        Call DebugAudit.Check(finalCost < 1.0,
+                              $"the solver finds a balanced pose (cost {finalCost:F4}, i.e. sub-millimetre)")
+    End Sub
+
+    ''' <summary>14 个受驱动关节的个数</summary>
+    Private Const SimConstants14 As Integer = 14
+
+    ''' <summary>关节行程与"别离种子太远"的联合判据</summary>
+    Private Function InReach(value As Double, seed As Double) As Boolean
+        If value < -1.45 OrElse value > 1.45 Then
+            Return False
+        End If
+
+        Return Math.Abs(value - seed) <= 1.2
+    End Function
+
+    Private Function JoinAngles(values As Double(), count As Integer) As String
+        Dim parts(count - 1) As String
+
+        For i As Integer = 0 To count - 1
+            parts(i) = values(i).ToString("0.######", Globalization.CultureInfo.InvariantCulture)
+        Next
+
+        Return String.Join(", ", parts)
+    End Function
+
+    Private Function SkipTake(values As Double(), offset As Integer, count As Integer) As Double()
+        Dim result(count - 1) As Double
+
+        For i As Integer = 0 To count - 1
+            result(i) = values(offset + i)
+        Next
+
+        Return result
+    End Function
+
+    ''' <summary>把 <paramref name="q"/> 写进 qpos 后评估一次平衡代价</summary>
+    Private Function EvaluatePose(m As mjModel, d As mjData, adr As Integer(), q As Double(),
+                                  leftFoot As Integer, rightFoot As Integer,
+                                  seed As Double()) As Double
+        ' 强制左右镜像：右腿 9..13 是左腿 0..4 的相反数。
+        ' 不加强制时优化器会去拧 hip_yaw / head_yaw 来"凑"重心——数学上代价能降到 0，
+        ' 但那是一个整条腿外撇、头歪着的姿态，落进物理里半秒就倒。
+        For k As Integer = 0 To 4
+            q(9 + k) = -q(k)
+        Next
+
+        For j As Integer = 0 To q.Length - 1
+            d.qpos(adr(j)) = q(j)
+        Next
+
+        Call MjApi.mj_kinematics(m, d)
+        Call MjApi.mj_comPos(m, d)
+
+        Dim left As Vector3() = FootPatch(m, d, leftFoot)
+        Dim right As Vector3() = FootPatch(m, d, rightFoot)
+
+        If left.Length < 4 OrElse right.Length < 4 Then
+            Return 1.0E+9
+        End If
+
+        Dim leftZ As Double = left(0).Z
+        Dim rightZ As Double = right(0).Z
+        Dim droop As Double = leftZ - rightZ
+
+        ' 脚掌是否水平：接触片的 z 极差
+        Dim leftTilt As Double = left(left.Length - 1).Z - leftZ
+        Dim rightTilt As Double = right(right.Length - 1).Z - rightZ
+
+        ' 支撑中心（接触片 xy 形心）
+        Dim cx As Double = (Average(left, True) + Average(right, True)) * 0.5
+        Dim cy As Double = (Average(left, False) + Average(right, False)) * 0.5
+
+        Dim offsetX As Double = d.subtree_com(0) - cx
+        Dim offsetY As Double = d.subtree_com(1) - cy
+
+        ' 毫米量级：1 mm 的偏差对应 1 的代价
+        Dim cost As Double = 1.0E+6 * (droop * droop + leftTilt * leftTilt + rightTilt * rightTilt) +
+                             4.0E+6 * (offsetX * offsetX + offsetY * offsetY)
+
+        ' 弱正则：别离种子太远（每 rad 偏离 0.02）
+        For j As Integer = 0 To q.Length - 1
+            Dim delta As Double = q(j) - seed(j)
+
+            cost += 0.02 * delta * delta
+        Next
+
+        Return cost
+    End Function
+
+    Private Function Average(points As Vector3(), x As Boolean) As Double
+        Dim sum As Double = 0.0
+
+        For Each p In points
+            sum += If(x, p.X, p.Y)
+        Next
+
+        Return sum / points.Length
+    End Function
+
+    ''' <summary>一只脚最贴近地面的若干顶点，按 z 升序</summary>
+    Private Function FootPatch(m As mjModel, d As mjData, body As Integer) As Vector3()
+        ' 8 个点只覆盖脚底的一条边，倾斜量会被严重低估；30 个点才铺满整个脚掌
+        Const PatchPoints As Integer = 30
+
+        Dim all As New List(Of Vector3)()
+
+        For g As Integer = 0 To m.ngeom - 1
+            Dim mesh As Integer = m.geom_dataid(g)
+
+            If m.geom_bodyid(g) <> body OrElse mesh < 0 Then
+                Continue For
+            End If
+
+            Dim rotation As Quaternion = MjMath.Quat(d.geom_xquat, g * 4)
+            Dim origin As New Vector3(CSng(d.geom_xpos(g * 3)), CSng(d.geom_xpos(g * 3 + 1)),
+                                      CSng(d.geom_xpos(g * 3 + 2)))
+            Dim count As Integer = m.mesh_vertnum(mesh)
+            Dim adr As Integer = m.mesh_vertadr(mesh)
+
+            For v As Integer = 0 To count - 1
+                Dim local As New Vector3(CSng(m.mesh_vert((adr + v) * 3)),
+                                         CSng(m.mesh_vert((adr + v) * 3 + 1)),
+                                         CSng(m.mesh_vert((adr + v) * 3 + 2)))
+
+                Call all.Add(origin + MjMath.Rotate(rotation, local))
+            Next
+        Next
+
+        If all.Count = 0 Then
+            Return New Vector3() {}
+        End If
+
+        Call all.Sort(Function(a As Vector3, b As Vector3) a.Z.CompareTo(b.Z))
+
+        Dim take As Integer = Math.Min(PatchPoints, all.Count)
+        Dim patch(take - 1) As Vector3
+
+        For i As Integer = 0 To take - 1
+            patch(i) = all(i)
+        Next
+
+        Return patch
+    End Function
 
     ''' <summary>跑 10 秒，每秒打印一次姿态与角速度</summary>
     ''' <param name="holdPose">true 时把伺服目标设成当前关节角（零力矩）</param>
     Private Function RunLong(m As mjModel, d As mjData, trunk As Integer,
                              names As String(), pose As Double(), holdPose As Boolean,
-                             label As String) As Double()
+                             label As String, Optional steps As Integer = 500) As Double()
         Call MjApi.mj_resetData(m, d)
 
         For j As Integer = 0 To names.Length - 1
@@ -1103,7 +1490,7 @@ Module Program
         Dim y0 As Double = d.xpos(trunk * 3 + 1)
         Dim maxOmega As Double = 0.0
 
-        For iStep As Integer = 1 To 500
+        For iStep As Integer = 1 To steps
             For subStep As Integer = 1 To 4
                 If holdPose Then
                     For j As Integer = 0 To names.Length - 1

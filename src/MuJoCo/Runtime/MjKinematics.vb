@@ -236,10 +236,14 @@ Public Module MjKinematics
             d.subtree_com(parent * 3 + 2) += d.subtree_com(i * 3 + 2)
         Next
 
+        ' 除以**子树总质量**，不是 body 自己的质量。
+        ' worldbody 的质量是 0，如果按单体质量去除，subtree_com[0]（整机质心）
+        ' 会走进 Else 分支被置成 xipos[0] = 0——所有依赖质心的量（subtreecom 传感器、
+        ' e_potential、静力学平衡求解）都会静默地拿到 (0,0,0)。
         For i As Integer = 0 To m.nbody - 1
-            Dim mass As Double = m.body_mass(i)
+            Dim mass As Double = m.body_subtreemass(i)
 
-            If mass > 0 Then
+            If mass > 1.0E-12 Then
                 d.subtree_com(i * 3 + 0) /= mass
                 d.subtree_com(i * 3 + 1) /= mass
                 d.subtree_com(i * 3 + 2) /= mass

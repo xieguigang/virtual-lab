@@ -730,6 +730,21 @@ Public Module MjcfCompiler
         Call CompileKeyframes(spec, model)
 
         ' ---- 统计 ----'
+        ' 每个 body 的**子树总质量**：质心除以它才是质心。
+        ' 用 body 自己的质量去除会让 worldbody（质量 0）的 subtree_com 恒为 0，
+        ' 整机质心因此永远报 (0,0,0)。
+        For i As Integer = 0 To model.nbody - 1
+            model.body_subtreemass(i) = model.body_mass(i)
+        Next
+
+        For i As Integer = model.nbody - 1 To 1 Step -1
+            Dim parent As Integer = model.body_parentid(i)
+
+            If parent >= 0 Then
+                model.body_subtreemass(parent) += model.body_subtreemass(i)
+            End If
+        Next
+
         Call ComputeStatistics(model)
 
         If errors.HasError Then
