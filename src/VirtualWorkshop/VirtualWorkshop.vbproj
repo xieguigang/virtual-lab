@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\..\GCModeller\src\runtime\sciBASIC#\physics\Particles\Particles.vbproj" />
     <ProjectReference Include="..\..\..\Microsoft.VisualBasic.Drawing\src\DXApi\DXApi.vbproj" />
     <ProjectReference Include="..\..\..\Microsoft.VisualBasic.Drawing\src\DxCanvas\DxCanvas.vbproj" />
+    <ProjectReference Include="..\MuJoCo\MuJoCo.vbproj" />
   </ItemGroup>
 
   <ItemGroup>
